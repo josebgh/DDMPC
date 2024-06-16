@@ -106,6 +106,7 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     SS_output.set_y_offset(linear_regression.linear_model.intercept_)
     SS_output.add_y(linear_regression.output)
     for f in linear_regression.inputs:
+        print(f.source)
         if f.source in model.controlled:
             for _ in range(0, f.lag):
                 coef = linear_regression.linear_model.coef_[0][total_i]
