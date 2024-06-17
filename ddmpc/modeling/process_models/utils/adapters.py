@@ -218,3 +218,40 @@ def LRinputs2SSvectors(input_values: Union[list, ca.MX, ca.DM, np.ndarray], stat
         raise ValueError("input_values has to be either a list, np.ndarray or ca.MX")
 
     return x, u, d
+
+def par_vals2SSvectors(par_vals: list, par_ids: list, state_space: StateSpace_ABCDE) -> tuple[list, list, list]:
+    """
+    This function receive the parameters vector and returns the state space vectors x, u and d.
+    """
+    par_dict = dict(zip(par_ids, par_vals))
+    nx = state_space.get_nx()
+    nu = state_space.get_nu()
+    ny = state_space.get_ny()
+    nd = state_space.get_nd()
+
+    x = list()
+    for f in state_space.SS_x:
+        for i in range(-f.lag,0):
+            key = (f.source.col_name, i+1)
+            x.append(par_dict[key])
+            
+    u = list()
+    for f in state_space.SS_u:
+        for i in range(-f.lag,-1):
+            key = (f.source.col_name, i+1)
+            u.append(par_dict[key])
+    
+    d_full = [0] # first element is 0 in order to first append include a list in the list and not the values.
+    j=0
+    f = state_space.SS_d[0]
+    while (f.source.col_name, j+1) in par_dict:
+        d = list()
+        for f in state_space.SS_d:
+            for i in range(-f.lag,0):
+                key = (f.source.col_name, i+1+j)
+                d.append(par_dict[key])
+        j+=1
+        d_full.append(d)
+    d_full.pop(0) # remove the first element
+
+    return x, u, d_full

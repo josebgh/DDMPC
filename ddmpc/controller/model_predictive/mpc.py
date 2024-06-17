@@ -5,6 +5,8 @@ from ddmpc.controller.model_predictive.nlp import NLP, NLPSolution
 from ddmpc.utils.file_manager import file_manager
 from ddmpc.utils.pickle_handler import read_pkl, write_pkl
 from ddmpc.utils.plotting import *
+import matlab.engine
+from ddmpc.modeling.process_models.utils.adapters import StateSpace_ABCDE,par_vals2SSvectors
 
 
 class ModelPredictive(Controller):
@@ -19,6 +21,7 @@ class ModelPredictive(Controller):
             show_solution_plot: bool = False,
             save_solution_plot: bool = True,
             save_solution_data: bool = True,
+            state_spaces:       list[StateSpace_ABCDE] = None,
     ):
         """ Model Predictive Controller """
 
@@ -32,6 +35,10 @@ class ModelPredictive(Controller):
         self.show_solution_plot: bool = show_solution_plot
         self.save_solution_plot: bool = save_solution_plot
         self.save_solution_data: bool = save_solution_data
+        self.par_vals = [0]
+        self.par_ids = [0]
+        self.eng = None
+        self.state_spaces = state_spaces
 
     def __str__(self):
         return f'ModelPredictive()'
@@ -47,9 +54,30 @@ class ModelPredictive(Controller):
         forecast = self._forecast_callback(horizon_in_seconds=int(self.nlp.N*self.step_size))
 
         # solve the nlp
-        par_vals: list[float] = self._get_par_vals(past, forecast, current_time)
-        solution: NLPSolution = self.nlp.solve(par_vals)
+        self.par_vals: list[float] = self._get_par_vals(past, forecast, current_time)
+        
+        self.par_ids = self._get_par_ids(past, forecast, current_time)
+        
+        if self.eng is None:
+            self.eng = matlab.engine.start_matlab()
+        # Here call the matlab function to solve the MPC
 
+        x,u,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
+        
+        self.eng.workspace['x'] = x
+        self.eng.workspace['u'] = u
+        self.eng.workspace['d'] = d_full
+        self.eng.workspace['A'] = self.state_spaces[0].A
+        self.eng.workspace['B'] = self.state_spaces[0].B
+        self.eng.workspace['C'] = self.state_spaces[0].C
+        self.eng.workspace['D'] = self.state_spaces[0].D
+        self.eng.workspace['E'] = self.state_spaces[0].E
+        self.eng.run('mpc_matlab.m', nargout=0)
+
+
+        solution: NLPSolution = self.nlp.solve(self.par_vals)
+
+        
         # retrieve the optimal controls
         controls: dict[str, float] = solution.optimal_controls
 
@@ -128,6 +156,60 @@ class ModelPredictive(Controller):
             par_vars.append(float(value))
 
         return par_vars
+    
+    def _get_par_ids(self, past: pd.DataFrame, forecast: pd.DataFrame, current_time: int) -> list[float]:
+        """ calculates the input list for the nlp """
+
+        par_vars = list()
+        par_ids = list()
+
+        # iterate over all par vars
+        for nlp_var in self.nlp._par_vars:
+
+            t = current_time + self.step_size * nlp_var.k
+
+            # if k <= 0 use the past DataFrame
+            if nlp_var.k <= 0:
+                value = past.loc[past['time'] == t, nlp_var.col_name].values
+                par_id = (past.loc[past['time'] == t, nlp_var.col_name].name , nlp_var.k)
+
+                if len(value) != 1:
+                    print(f'Error occurred while getting par var {nlp_var}')
+                    print('k =', nlp_var.k)
+                    print('time =', int(t), datetime.datetime.fromtimestamp(t))
+                    print('current_time=', int(current_time), datetime.datetime.fromtimestamp(current_time))
+                    print(nlp_var.col_name)
+
+                    past['t'] = past['time'].apply(func=datetime.datetime.fromtimestamp)
+                    pd.set_option('display.float_format', lambda x: '%.2f' % x)
+
+                    print(past.tail(n=self.nlp.max_lag).to_string())
+
+                    raise ValueError('Error occurred, while getting par vars')
+
+            # if k > 0 use the forecast DataFrame
+            else:
+
+                if nlp_var.col_name not in forecast.columns:
+                    forecast = nlp_var.feature.source.process(forecast)
+
+                try:
+                    value = forecast.loc[forecast['time'] == t, nlp_var.col_name].values
+                    par_id = (forecast.loc[forecast['time'] == t, nlp_var.col_name].name , nlp_var.k)
+                    assert len(value) == 1,\
+                        f'{nlp_var} with col_name={nlp_var.col_name} at t={t} was not found in: \n {forecast.to_string()}'
+
+                except KeyError:
+                    raise KeyError(f'{nlp_var} with col_name={nlp_var.col_name} was not found in {forecast.columns}.')
+
+            assert len(value) == 1
+            assert value[0] is not None
+            assert value[0] != np.nan, f'Detected nan for {nlp_var}'
+
+            par_vars.append(float(value))
+            par_ids.append(par_id)
+
+        return par_ids
 
     def _save_solution(self, df: pd.DataFrame, current_time: int):
 
