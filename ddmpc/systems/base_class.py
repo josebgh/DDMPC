@@ -188,7 +188,6 @@ class System(abc.ABC):
 
                         # calculate the controls
                         controls, additional_columns = controller(df.loc[df.index <= idx])
-
                         # write controls to the system
                         self.write(controls)
 

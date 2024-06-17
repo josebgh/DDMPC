@@ -195,9 +195,11 @@ class ModelPredictive(Controller):
 
         # solve the nlp
         par_vals: list[float] = self._get_par_vals(past, forecast, current_time)
+        par_ids: list[float] = self._get_par_ids(past, forecast, current_time)
         solution: NLPSolution = self.nlp.solve(par_vals)
         print('solution.optimal_controls:', solution.optimal_controls)
         print('par_vals:', par_vals)
+        print('par_ids:', par_ids)
         # Call the MATLAB function
         if self.eng is None:
             self.eng = matlab.engine.start_matlab()
@@ -285,6 +287,61 @@ class ModelPredictive(Controller):
             par_vars.append(float(value))
 
         return par_vars
+    
+    
+    def _get_par_ids(self, past: pd.DataFrame, forecast: pd.DataFrame, current_time: int) -> list[float]:
+        """ calculates the input list for the nlp """
+
+        par_vars = list()
+        par_ids = list()
+
+        # iterate over all par vars
+        for nlp_var in self.nlp._par_vars:
+
+            t = current_time + self.step_size * nlp_var.k
+
+            # if k <= 0 use the past DataFrame
+            if nlp_var.k <= 0:
+                value = past.loc[past['time'] == t, nlp_var.col_name].values
+                par_id = (past.loc[past['time'] == t, nlp_var.col_name].name , nlp_var.k)
+
+                if len(value) != 1:
+                    print(f'Error occurred while getting par var {nlp_var}')
+                    print('k =', nlp_var.k)
+                    print('time =', int(t), datetime.datetime.fromtimestamp(t))
+                    print('current_time=', int(current_time), datetime.datetime.fromtimestamp(current_time))
+                    print(nlp_var.col_name)
+
+                    past['t'] = past['time'].apply(func=datetime.datetime.fromtimestamp)
+                    pd.set_option('display.float_format', lambda x: '%.2f' % x)
+
+                    print(past.tail(n=self.nlp.max_lag).to_string())
+
+                    raise ValueError('Error occurred, while getting par vars')
+
+            # if k > 0 use the forecast DataFrame
+            else:
+
+                if nlp_var.col_name not in forecast.columns:
+                    forecast = nlp_var.feature.source.process(forecast)
+
+                try:
+                    value = forecast.loc[forecast['time'] == t, nlp_var.col_name].values
+                    par_id = (forecast.loc[forecast['time'] == t, nlp_var.col_name].name , nlp_var.k)
+                    assert len(value) == 1,\
+                        f'{nlp_var} with col_name={nlp_var.col_name} at t={t} was not found in: \n {forecast.to_string()}'
+
+                except KeyError:
+                    raise KeyError(f'{nlp_var} with col_name={nlp_var.col_name} was not found in {forecast.columns}.')
+
+            assert len(value) == 1
+            assert value[0] is not None
+            assert value[0] != np.nan, f'Detected nan for {nlp_var}'
+
+            par_vars.append(float(value))
+            par_ids.append(par_id)
+
+        return par_ids
 
     def _save_solution(self, df: pd.DataFrame, current_time: int):
 
