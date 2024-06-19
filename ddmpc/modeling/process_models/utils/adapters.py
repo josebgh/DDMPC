@@ -14,8 +14,8 @@ class StateSpace_ABCDE:
     """StateSpace(A, B, C, D, E)
 
         Construct a state space object such that:
-        x = A*x + B*u + E*d
-        y = C*x + D*u
+        x = A*x + B*u
+        y = C*x + D*u + E*d + y_offset
 
         It also contains the list of inputs (.SS_u), outputs (.SS_y), states (.SS_x) and disturbances (.SS_d) atrributes.
     """
@@ -25,7 +25,7 @@ class StateSpace_ABCDE:
         self.C = np.zeros((0,0))
         self.D = np.zeros((0,0))
         self.E = np.zeros((0,0))
-        self.y_offset = 0
+        self.y_offset = np.array([0.])
         self.SS_x = list() # list of states (Input objects)
         self.SS_d = list() # list of disturbances (Input objects)
         self.SS_u = list() # list of inputs (Input objects)
@@ -47,8 +47,11 @@ class StateSpace_ABCDE:
     def set_E(self, E: np.matrix):
         self.E = E
 
-    def set_y_offset(self, y_offset: float):
-        self.y_offset = y_offset
+    def set_y_offset(self, y_offset: float, pos:int=0):
+        if pos > len(self.y_offset)-1:
+            self.y_offset = np.append(self.y_offset, y_offset)
+        else:
+            self.y_offset[pos] = y_offset
 
     def add_x(self, input : Input):
         self.SS_x.append(input)
@@ -73,6 +76,14 @@ class StateSpace_ABCDE:
     
     def get_ny(self):
         return self.C.shape[0]
+    
+    def get_extended_vector(self, vector: list()) -> list:
+        """
+        This function returns the extended vector of the variable var. Receive the own vector SS_x, SS_u, SS_d or SS_y.
+        """
+        
+        vector = [(var.name,(k)) for var in vector for k in range(var.lag if hasattr(var, 'lag') else 1)]
+        return vector
 
 def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE:
     """
@@ -100,8 +111,8 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     E = np.zeros((nx, nd))
 
     total_i = 0
-    A_i = 0
-    B_i = 0
+    C_i = 0
+    D_i = 0
     E_i = 0
     SS_output.set_y_offset(linear_regression.linear_model.intercept_)
     SS_output.add_y(linear_regression.output)
@@ -109,15 +120,15 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
         if f.source in model.controlled:
             for _ in range(0, f.lag):
                 coef = linear_regression.linear_model.coef_[0][total_i]
-                A[0][A_i] = coef
-                A_i += 1
+                C[0][C_i] = coef
+                C_i += 1
                 total_i += 1
             SS_output.add_x(f)
         elif f.source in model.controls:
             for _ in range(0, f.lag):
                 coef = linear_regression.linear_model.coef_[0][total_i]
-                B[0][B_i] = coef
-                B_i += 1
+                D[0][D_i] = coef
+                D_i += 1
                 total_i += 1
             SS_output.add_u(f)
         else:
@@ -127,7 +138,6 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
                 E_i += 1
                 total_i += 1
             SS_output.add_d(f)
-    C[0][0] = 1
     SS_output.set_A(A)
     SS_output.set_B(B)
     SS_output.set_C(C)

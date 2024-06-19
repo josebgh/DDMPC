@@ -3,6 +3,7 @@ import warnings
 from abc import ABC, abstractmethod
 from typing import Optional, Iterator
 from typing import Union
+import copy
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,6 @@ from ddmpc.modeling.features.features import Feature, Source, Constructed, Contr
 from ddmpc.modeling.modeling import Model
 from ddmpc.modeling.predicting import Predictor
 from ddmpc.utils.modes import Economic, Steady
-
 
 class Objective:
     """ objective function for the optimization problem """
@@ -151,6 +151,32 @@ class NLPValue(NLPVariable):
 
     def __repr__(self):
         return f'{__class__.__name__}({self.feature}[{"%+d" % self.k}])'
+
+
+class NLPValueSS(NLPValue):
+    
+        def __init__(
+                self,
+                feature:    Feature,
+        ):
+            super(NLPValueSS, self).__init__(feature=feature, k=0)
+
+            self._mx: MX = MX.sym(f'{self.__class__.__name__}({self.feature}_ss)')
+
+        @property
+        def mx(self) -> MX:
+            return self._mx
+
+    
+        @property
+        def col_name(self):
+            return self.feature.source.col_name
+    
+        def __str__(self):
+            return f'{__class__.__name__}({self.feature})'
+    
+        def __repr__(self):
+            return f'{__class__.__name__}({self.feature})'
 
 
 class NLPTarget(NLPVariable):
@@ -478,6 +504,9 @@ class NLP:
 
             for k in range(1, self.N + 1):
                 self._add_opt_var(NLPValue(feature=x, k=k))
+                # x_ss = copy.deepcopy(x)
+                # x_ss.source.name = x.source.name + '_ss'
+                # self._add_opt_var(NLPValueSS(feature=x, k=k))
 
         for u in self.model.controls:
 

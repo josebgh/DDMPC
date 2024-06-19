@@ -1,4 +1,5 @@
 """ mpc.py: Model Predictive Controller, Objectives and Constraints"""
+import copy
 
 from ddmpc.controller.conventional import Controller
 from ddmpc.controller.model_predictive.nlp import NLP, NLPSolution
@@ -40,6 +41,184 @@ class ModelPredictive(Controller):
         self.eng = None
         self.state_spaces = state_spaces
 
+    def setupMatlab(self,state_spaces: list[StateSpace_ABCDE] = None):
+        '''
+        Set the parameters for the MPC in the workspace of the matlab engine. IMPORTANT:
+        This function has to be called after the nlp.build function. And then send the
+        reidentified state space models.
+        '''
+        if state_spaces is None:
+            state_spaces = self.state_spaces
+        self.state_spaces = state_spaces
+
+        #CONVERTIR ESTO EN UN MÉTODO JOIN STATE SPACES. OJO QUE ESTAMOS TENIENDO EN CUENTA QUE ES PARA LOS 
+        #REGRESORES, DONDE SIEMPRE SE TIENE A COMO EYE Y B COMO ZEROS.
+
+        #ARREGLAR EL HECHO DE QUE CUANDO AÑADO ADD_X,U.. TENGO QUE PONER LA FEATURE, NO LA TUPLA
+        state_space_joined = StateSpace_ABCDE()
+        for (n,state_space) in enumerate(self.state_spaces):
+            if n == 0:
+                state_space_joined = copy.deepcopy(state_space)
+                print("n=0 -> y_offset",state_space.y_offset)
+            else:
+
+                # Add y features
+                state_space_joined.add_y(state_space.SS_y[0])
+                print("setting y_offset",state_space.y_offset)
+                state_space_joined.set_y_offset(state_space.y_offset[0],len(state_space.y_offset))
+
+                #Add x features
+                nx_added = 0
+                for x in state_space.get_extended_vector(state_space.SS_x):
+                    if x not in state_space_joined.get_extended_vector(state_space_joined.SS_x):
+                        nx_added+=1
+                        for (i,f) in enumerate(state_space_joined.SS_x):
+                            if f.name == x[0]:
+                                state_space_joined.SS_x[i].lag = max(state_space_joined.SS_x[i].lag, x[1])
+                        A_new = np.eye(1+state_space_joined.A.shape[0])
+                        state_space_joined.set_A(A_new)
+                        B_new = np.zeros((state_space_joined.B.shape[0]+1,state_space_joined.B.shape[1]))
+                        state_space_joined.set_B(B_new)
+
+                C_new = np.zeros((state_space_joined.C.shape[0]+1,state_space_joined.C.shape[1]+nx_added))
+                if nx_added>0:
+                    C_new[:-1,:-nx_added] = state_space_joined.C
+                else:
+                    C_new[:-1,:] = state_space_joined.C
+                for (i,x) in enumerate(state_space.get_extended_vector(state_space.SS_x)):
+                    for (j,x_joined) in enumerate(state_space_joined.get_extended_vector(state_space_joined.SS_x)):
+                        if x==x_joined:
+                            C_new[-1,j] = state_space.C[0,i]
+                state_space_joined.set_C(C_new)
+
+                # Add u features
+                nu_added = 0
+                for u in state_space.get_extended_vector(state_space.SS_u):
+                    if u not in state_space_joined.get_extended_vector(state_space_joined.SS_u):
+                        nu_added+=1
+                        for (i,f) in enumerate(state_space_joined.SS_u):
+                            if f.name == u[0]:
+                                state_space_joined.SS_u[i].lag = max(state_space_joined.SS_u[i].lag, u[1])
+                        B_new = np.zeros((state_space_joined.B.shape[0],state_space_joined.B.shape[1]+1))
+                        state_space_joined.set_B(B_new)
+
+                D_new = np.zeros((state_space_joined.D.shape[0]+1,state_space_joined.D.shape[1]+nu_added))
+                if nx_added>0:
+                    D_new[:-1,:-nu_added] = state_space_joined.D
+                else:
+                    D_new[:-1,:] = state_space_joined.D
+                for (i,u) in enumerate(state_space.get_extended_vector(state_space.SS_u)):
+                    for (j,u_joined) in enumerate(state_space_joined.get_extended_vector(state_space_joined.SS_u)):
+                        if u==u_joined:
+                            D_new[-1,j] = state_space.D[0,i]
+                state_space_joined.set_D(D_new)
+                        
+                # Add d features
+                nd_added = 0
+                for d in state_space.get_extended_vector(state_space.SS_d):
+                    if d not in state_space_joined.get_extended_vector(state_space_joined.SS_d):
+                        nd_added+=1
+                        for (i,f) in enumerate(state_space_joined.SS_d):
+                            if f.name == d[0]:
+                                state_space_joined.SS_d[i].lag = max(state_space_joined.SS_d[i].lag, d[1])
+
+                E_new = np.zeros((state_space_joined.E.shape[0]+1,state_space_joined.E.shape[1]+nd_added))
+                if nd_added>0:
+                    E_new[:-1,:-nd_added] = state_space_joined.E
+                else:
+                    E_new[:-1,:] = state_space_joined.E
+                for (i,d) in enumerate(state_space.get_extended_vector(state_space.SS_d)):
+                    for (j,d_joined) in enumerate(state_space_joined.get_extended_vector(state_space_joined.SS_d)):
+                        if d==d_joined:
+                            E_new[-1,j] = state_space.E[0,i]
+                state_space_joined.set_E(E_new)
+                
+
+            if self.eng is None:
+                self.eng = matlab.engine.start_matlab()
+            
+            state_space = state_space_joined
+            # Set the state space matrices in the workspace
+            self.eng.workspace['A'] = state_space.A
+            self.eng.workspace['B'] = state_space.B
+            self.eng.workspace['C'] = state_space.C
+            self.eng.workspace['D'] = state_space.D
+            self.eng.workspace['E'] = state_space.E
+            print("y_offset",state_space.y_offset)
+            self.eng.workspace['y_offset'] = state_space.y_offset
+
+            # Set the contraints in the workspace
+            constraints = {constraint.feature.source.col_name: (constraint.lb, constraint.ub) for constraint in self.nlp.constraints}
+
+            x_lb = np.zeros((state_space.get_nx(),1))
+            x_ub = np.zeros((state_space.get_nx(),1))
+            x_extended = state_space.get_extended_vector(state_space.SS_x)
+            for i in range(state_space.get_nx()):
+                if x_extended[i][0] in constraints.keys():
+                    x_lb[i] = constraints[x_extended[i][0]][0]
+                    x_ub[i] = constraints[x_extended[i][0]][1]
+                else:
+                    x_lb[i] = -np.inf
+                    x_ub[i] = np.inf
+            self.eng.workspace['x_lb'] = x_lb
+            self.eng.workspace['x_ub'] = x_ub
+
+
+            u_lb = np.zeros((state_space.get_nu(),1))
+            u_ub = np.zeros((state_space.get_nu(),1))
+            u_extended = state_space.get_extended_vector(state_space.SS_u)
+            for i in range(state_space.get_nu()):
+                if u_extended[i][0] in constraints.keys():
+                    u_lb[i] = constraints[u_extended[i][0]][0]
+                    u_ub[i] = constraints[u_extended[i][0]][1]
+                else:
+                    u_lb[i] = -np.inf
+                    u_ub[i] = np.inf
+            self.eng.workspace['u_lb'] = u_lb
+            self.eng.workspace['u_ub'] = u_ub
+
+            d_lb = np.zeros((state_space.get_nd(),1))
+            d_ub = np.zeros((state_space.get_nd(),1))
+            d_extended = state_space.get_extended_vector(state_space.SS_d)
+            for i in range(state_space.get_nd()):
+                if d_extended[i][0] in constraints.keys():
+                    d_lb[i] = constraints[d_extended[i][0]][0]
+                    d_ub[i] = constraints[d_extended[i][0]][1]
+                else:
+                    d_lb[i] = -np.inf
+                    d_ub[i] = np.inf
+            self.eng.workspace['d_lb'] = d_lb
+            self.eng.workspace['d_ub'] = d_ub
+
+            y_lb = np.zeros((state_space.get_ny(),1))
+            y_ub = np.zeros((state_space.get_ny(),1))
+            y_extended = state_space.get_extended_vector(state_space.SS_y)
+            for i in range(state_space.get_ny()):
+                if y_extended[i][0] in constraints.keys():
+                    y_lb[i] = constraints[y_extended[i][0]][0]
+                    y_ub[i] = constraints[y_extended[i][0]][1]
+                else:
+                    y_lb[i] = -np.inf
+                    y_ub[i] = np.inf
+            self.eng.workspace['y_lb'] = y_lb
+            self.eng.workspace['y_ub'] = y_ub
+
+
+        # HERE WE SHOULD FIGURE OUT HOW TO JOIN STATE SPACES. IN FACT MATRICES C AND D SHOULD BE  CREATED FROM OBJETIVES BETTER
+
+        # Set the objective functions in the workspace
+        # We will assume just linear and quadratic cost functions, so there will be _quad and _lin weighting matrices.
+        # nc = sum([1 for objective in self.nlp.objectives if objective.cost.__class__.__name__ == 'Quadratic'])
+        nc =len(self.nlp.objectives) # Number of objectives
+        S_q = np.zeros((nc,nc))
+        S_l = np.zeros((1,nc))
+        for i, objective in enumerate(self.nlp.objectives):
+            if objective.cost.__class__.__name__ == 'Quadratic':
+                S_q[i,i] = objective.cost.weight
+            elif objective.cost.__class__.__name__ == 'AbsoluteLinear':
+                S_l[0,i] = objective.cost.weight
+
+
     def __str__(self):
         return f'ModelPredictive()'
 
@@ -58,20 +237,14 @@ class ModelPredictive(Controller):
         
         self.par_ids = self._get_par_ids(past, forecast, current_time)
         
-        if self.eng is None:
-            self.eng = matlab.engine.start_matlab()
+        
         # Here call the matlab function to solve the MPC
 
-        x,u,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
+        x0,u_pre,d_pre_fut = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
         
-        self.eng.workspace['x'] = x
-        self.eng.workspace['u'] = u
-        self.eng.workspace['d'] = d_full
-        self.eng.workspace['A'] = self.state_spaces[0].A
-        self.eng.workspace['B'] = self.state_spaces[0].B
-        self.eng.workspace['C'] = self.state_spaces[0].C
-        self.eng.workspace['D'] = self.state_spaces[0].D
-        self.eng.workspace['E'] = self.state_spaces[0].E
+        self.eng.workspace['x0'] = x0
+        self.eng.workspace['u_pre'] = u_pre
+        self.eng.workspace['d_pre_fut'] = d_pre_fut
         self.eng.run('mpc_matlab.m', nargout=0)
 
 

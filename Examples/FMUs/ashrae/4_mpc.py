@@ -67,6 +67,10 @@ for repetition in range(5):  # Start online learning loop
         predictors=[TAirRoom_predictor_SS, Q_flowAhu_predictor_SS],
     )
 
+    ThermalZone_MPC.setupMatlab(
+        state_spaces = [TAirRoom_predictor_SS.state_space, Q_flowAhu_predictor_SS.state_space],
+    )
+
     online_data = system.run(  # run system with MPC for desired time
         controllers=[ThermalZone_MPC],
         duration=one_day * 1,
