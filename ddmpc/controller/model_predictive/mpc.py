@@ -298,7 +298,7 @@ class ModelPredictive(Controller):
         S_l = np.zeros((1,ny))
         eps_vars = np.zeros((1,ny))
         eps_weights = np.zeros((ny,ny))
-        day_hours = np.array([0 24])
+        day_hours = np.array([0,24])
         for objective in self.nlp.objectives:
             if isinstance(objective.feature, Controlled):
                 if isinstance(objective.feature.mode, Economic):
@@ -310,17 +310,18 @@ class ModelPredictive(Controller):
                             y_lb_day[i] = self.nlp.model.controlled[0].mode.day_lb
                             y_ub_day[i] = self.nlp.model.controlled[0].mode.day_ub
                             y_lb_night[i] = self.nlp.model.controlled[0].mode.night_lb
-                            y_ub_night[i] =self.nlp.model.controlled[0].mode.night_up
+                            y_ub_night[i] =self.nlp.model.controlled[0].mode.night_ub
                             day_hours = np.array([self.nlp.model.controlled[0].mode.day_start, self.nlp.model.controlled[0].mode.day_end])
                 elif isinstance(objective.feature.mode, Steady):
-                    raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
-                                                f'for Objective {objective}.')
+                    pass
+                    # raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
+                    #                             f'for Objective {objective}.')
                 else:
-                    raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
+                    raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                                 f'for Objective {objective}.')
 
             elif isinstance(objective.cost, AbsoluteLinear):
-
+                pass
                 # eps1 = NLPEpsilon(feature=feature, k=k)
                 # eps2 = NLPEpsilon(feature=feature, k=k)
                 # self._opt_vars.append(eps1)
@@ -353,7 +354,7 @@ class ModelPredictive(Controller):
             elif isinstance(objective.cost, AbsoluteLinear):
                 S_l[0,i] = objective.cost.weight
             else:
-                raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
+                raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                             f'for Objective {objective}.')
 
 
@@ -361,6 +362,7 @@ class ModelPredictive(Controller):
         self.eng.workspace['S_q'] = S_q
         self.eng.workspace['S_l'] = S_l
         self.eng.workspace['eps_vars'] = eps_vars
+        self.eng.workspace['eps_weights'] = eps_weights
         self.eng.workspace['y_lb_day'] = y_lb_day
         self.eng.workspace['y_ub_day'] = y_ub_day
         self.eng.workspace['y_lb_night'] = y_lb_night
