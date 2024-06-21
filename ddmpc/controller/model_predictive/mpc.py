@@ -9,6 +9,8 @@ from ddmpc.utils.plotting import *
 import matlab.engine
 from ddmpc.modeling.process_models.utils.adapters import StateSpace_ABCDE,par_vals2SSvectors
 from ddmpc.modeling.features.features import Feature, Source, Constructed, Controlled, Control,Connection
+from ddmpc.utils.modes import Economic, Steady
+from ddmpc.controller.model_predictive.costs import Cost, AbsoluteLinear, Quadratic
 
 
 class ModelPredictive(Controller):
@@ -142,7 +144,7 @@ class ModelPredictive(Controller):
             if objective.feature.source in [f .source if hasattr(f, 'source') else f for f in self.state_space_joined.SS_y]:
                 pass
             else:
-                if objective.feature.__class__ is Control: #NUNCA ENTRA AQUÍ, CONTROL ES CLASS CONTROLLED
+                if isinstance(objective.feature, Control):
                     # Convertir una y que apunte a la variable de control
                     for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u)):
                         if u == (objective.feature.source.read_name,0):
@@ -160,7 +162,7 @@ class ModelPredictive(Controller):
                             E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]))
                             E_new[:-1,:] = self.state_space_joined.E
                             self.state_space_joined.set_E(E_new)
-                elif  objective.feature.__class__ is Controlled:
+                elif  isinstance(objective.feature, Controlled):
                     # Convertir una y que apunte a la variable de estado
                     for (i,x) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x)):
                         if x == (objective.feature.source.read_name,0):
@@ -179,7 +181,7 @@ class ModelPredictive(Controller):
                             E_new[:-1,:] = self.state_space_joined.E
                             self.state_space_joined.set_E(E_new)
 
-                elif objective.feature.__class__ is Connection:
+                elif isinstance(objective.feature, Connection):
                     y_new = copy.deepcopy(objective.feature.source)
                     self.state_space_joined.add_y(y_new)
                     self.state_space_joined.set_y_offset(0.,len(self.state_space_joined.y_offset))
@@ -226,20 +228,8 @@ class ModelPredictive(Controller):
         print("y_offset",self.state_space_joined.y_offset)
         self.eng.workspace['y_offset'] = self.state_space_joined.y_offset
 
-        # UPDATE objectiveS CALCULATION ACCORDING PREVIOUS SS
-        nc =len(self.nlp.objectives) # Number of objectives
-        S_q = np.zeros((nc,nc))
-        S_l = np.zeros((1,nc))
-        for i, objective in enumerate(self.nlp.objectives):
-            if objective.cost.__class__.__name__ == 'Quadratic':
-                S_q[i,i] = objective.cost.weight
-            elif objective.cost.__class__.__name__ == 'AbsoluteLinear':
-                S_l[0,i] = objective.cost.weight
 
 
-
-
-                
 
         # Set the contraints in the workspace
         constraints = {constraint.feature.source.col_name: (constraint.lb, constraint.ub) for constraint in self.nlp.constraints}
@@ -284,18 +274,102 @@ class ModelPredictive(Controller):
         self.eng.workspace['d_lb'] = d_lb
         self.eng.workspace['d_ub'] = d_ub
 
-        y_lb = np.zeros((self.state_space_joined.get_ny(),1))
-        y_ub = np.zeros((self.state_space_joined.get_ny(),1))
+        y_lb_day = np.zeros((self.state_space_joined.get_ny(),1))
+        y_ub_day = np.zeros((self.state_space_joined.get_ny(),1))
+        y_lb_night = np.zeros((self.state_space_joined.get_ny(),1))
+        y_ub_night = np.zeros((self.state_space_joined.get_ny(),1))
         y_extended = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_y)
         for i in range(self.state_space_joined.get_ny()):
             if y_extended[i][0] in constraints.keys():
-                y_lb[i] = constraints[y_extended[i][0]][0]
-                y_ub[i] = constraints[y_extended[i][0]][1]
+                y_lb_day[i] = constraints[y_extended[i][0]][0]
+                y_ub_day[i] = constraints[y_extended[i][0]][1]
+                y_lb_night[i] = constraints[y_extended[i][0]][0]
+                y_ub_night[i] = constraints[y_extended[i][0]][1]
             else:
-                y_lb[i] = -np.inf
-                y_ub[i] = np.inf
-        self.eng.workspace['y_lb'] = y_lb
-        self.eng.workspace['y_ub'] = y_ub
+                y_lb_day[i] = -np.inf
+                y_ub_day[i] = np.inf
+                y_lb_night[i] = -np.inf
+                y_ub_night[i] = np.inf
+
+
+        # Set the objectives in the workspace. Note that some objectives are translated into constraints
+        ny = self.state_space_joined.get_ny()
+        S_q = np.zeros((ny,ny))
+        S_l = np.zeros((1,ny))
+        eps_vars = np.zeros((1,ny))
+        eps_weights = np.zeros((ny,ny))
+        day_hours = np.array([0 24])
+        for objective in self.nlp.objectives:
+            if isinstance(objective.feature, Controlled):
+                if isinstance(objective.feature.mode, Economic):
+                    for i,y in enumerate(self.state_space_joined.SS_y):
+                        if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
+                            print(f"{i} : {objective.feature.source.col_name} : {y.source.col_name}")
+                            eps_vars[0,i] = 1
+                            eps_weights[i,i] = objective.cost.weight
+                            y_lb_day[i] = self.nlp.model.controlled[0].mode.day_lb
+                            y_ub_day[i] = self.nlp.model.controlled[0].mode.day_ub
+                            y_lb_night[i] = self.nlp.model.controlled[0].mode.night_lb
+                            y_ub_night[i] =self.nlp.model.controlled[0].mode.night_up
+                            day_hours = np.array([self.nlp.model.controlled[0].mode.day_start, self.nlp.model.controlled[0].mode.day_end])
+                elif isinstance(objective.feature.mode, Steady):
+                    raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
+                                                f'for Objective {objective}.')
+                else:
+                    raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
+                                                f'for Objective {objective}.')
+
+            elif isinstance(objective.cost, AbsoluteLinear):
+
+                # eps1 = NLPEpsilon(feature=feature, k=k)
+                # eps2 = NLPEpsilon(feature=feature, k=k)
+                # self._opt_vars.append(eps1)
+                # self._opt_vars.append(eps2)
+
+                # # t1 - t2 = x
+                # self._constraints.append(
+                #     NLPConstraint(expression=eps1.mx - eps2.mx - nlp_value.mx, lb=0, ub=0)
+                # )
+                # # eps1 > 0
+                # self._constraints.append(
+                #     NLPConstraint(expression=eps1.mx, lb=0, ub=inf)
+                # )
+                # # eps2 > 0
+                # self._constraints.append(
+                #     NLPConstraint(expression=eps2.mx, lb=0, ub=inf)
+                # )
+
+                # self._objectives.append(
+                #     NLPObjective(objective(eps1.mx))
+                # )
+
+                # self._objectives.append(
+                #     NLPObjective(objective(eps2.mx))
+                # )
+
+
+            elif isinstance(objective.cost, Quadratic):
+                S_q[i,i] = objective.cost.weight
+            elif isinstance(objective.cost, AbsoluteLinear):
+                S_l[0,i] = objective.cost.weight
+            else:
+                raise NotImplementedError(f'Mode {feature.mode} is not implemented yet '
+                                            f'for Objective {objective}.')
+
+
+        # Sent the variables to the workspace of the matlab engine
+        self.eng.workspace['S_q'] = S_q
+        self.eng.workspace['S_l'] = S_l
+        self.eng.workspace['eps_vars'] = eps_vars
+        self.eng.workspace['y_lb_day'] = y_lb_day
+        self.eng.workspace['y_ub_day'] = y_ub_day
+        self.eng.workspace['y_lb_night'] = y_lb_night
+        self.eng.workspace['y_ub_night'] = y_ub_night
+        self.eng.workspace['day_hours'] = day_hours
+
+
+
+                
 
         
 
