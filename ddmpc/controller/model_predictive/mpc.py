@@ -296,63 +296,50 @@ class ModelPredictive(Controller):
         ny = self.state_space_joined.get_ny()
         S_q = np.zeros((ny,ny))
         S_l = np.zeros((1,ny))
-        eps_vars = np.zeros((1,ny))
-        eps_weights = np.zeros((ny,ny))
+        eps_vars_Eco = np.zeros((1,ny))
+        eps_weights_Eco = np.zeros((ny,ny))
+        eps_vars_AbsLin = np.zeros((1,ny))
+        eps_weights_AbsLin = np.zeros((ny,ny))
         day_hours = np.array([0,24])
+        y_ref_day = np.zeros((1,ny))
+        y_ref_night = np.zeros((1,ny))
         for objective in self.nlp.objectives:
             if isinstance(objective.feature, Controlled):
                 if isinstance(objective.feature.mode, Economic):
                     for i,y in enumerate(self.state_space_joined.SS_y):
                         if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
-                            print(f"{i} : {objective.feature.source.col_name} : {y.source.col_name}")
-                            eps_vars[0,i] = 1
-                            eps_weights[i,i] = objective.cost.weight
-                            y_lb_day[i] = self.nlp.model.controlled[0].mode.day_lb
-                            y_ub_day[i] = self.nlp.model.controlled[0].mode.day_ub
-                            y_lb_night[i] = self.nlp.model.controlled[0].mode.night_lb
-                            y_ub_night[i] =self.nlp.model.controlled[0].mode.night_ub
-                            day_hours = np.array([self.nlp.model.controlled[0].mode.day_start, self.nlp.model.controlled[0].mode.day_end])
+                            eps_vars_Eco[0,i] = 1
+                            eps_weights_Eco[i,i] = objective.cost.weight
+                            for controlled in self.nlp.model.controlled:
+                                print(f"{controlled.source.col_name} == {objective.feature.source.col_name}")
+                                if controlled.source.col_name == objective.feature.source.col_name:
+                                    print(controlled.source.name)
+                                    y_lb_day[i] = controlled.mode.day_lb
+                                    y_ub_day[i] = controlled.mode.day_ub
+                                    y_lb_night[i] = controlled.mode.night_lb
+                                    y_ub_night[i] =controlled.mode.night_ub
+                                    day_hours = np.array([controlled.mode.day_start, controlled.mode.day_end])
                 elif isinstance(objective.feature.mode, Steady):
-                    pass
-                    # raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
-                    #                             f'for Objective {objective}.')
+                    for i,y in enumerate(self.state_space_joined.SS_y):
+                        if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
+                            if isinstance(objective.cost, Quadratic):
+                                S_q[i,i] = objective.cost.weight
+                            elif isinstance(objective.cost, AbsoluteLinear):
+                                # S_l[0,i] = objective.cost.weight
+                                eps_vars_AbsLin[0,i] = 1
+                                eps_weights_AbsLin[i,i] = objective.cost.weight
+                                y_ref_day[0,i] = objective.feature.mode.day_target
+                                y_ref_night[0,i] = objective.feature.mode.night_target
                 else:
                     raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                                 f'for Objective {objective}.')
-
             elif isinstance(objective.cost, AbsoluteLinear):
-                pass
-                # eps1 = NLPEpsilon(feature=feature, k=k)
-                # eps2 = NLPEpsilon(feature=feature, k=k)
-                # self._opt_vars.append(eps1)
-                # self._opt_vars.append(eps2)
-
-                # # t1 - t2 = x
-                # self._constraints.append(
-                #     NLPConstraint(expression=eps1.mx - eps2.mx - nlp_value.mx, lb=0, ub=0)
-                # )
-                # # eps1 > 0
-                # self._constraints.append(
-                #     NLPConstraint(expression=eps1.mx, lb=0, ub=inf)
-                # )
-                # # eps2 > 0
-                # self._constraints.append(
-                #     NLPConstraint(expression=eps2.mx, lb=0, ub=inf)
-                # )
-
-                # self._objectives.append(
-                #     NLPObjective(objective(eps1.mx))
-                # )
-
-                # self._objectives.append(
-                #     NLPObjective(objective(eps2.mx))
-                # )
-
-
+                for i,y in enumerate(self.state_space_joined.SS_y):
+                    if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
+                        eps_vars_AbsLin[0,i] = 1
+                        eps_weights_AbsLin[i,i] = objective.cost.weight
             elif isinstance(objective.cost, Quadratic):
                 S_q[i,i] = objective.cost.weight
-            elif isinstance(objective.cost, AbsoluteLinear):
-                S_l[0,i] = objective.cost.weight
             else:
                 raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                             f'for Objective {objective}.')
@@ -361,8 +348,8 @@ class ModelPredictive(Controller):
         # Sent the variables to the workspace of the matlab engine
         self.eng.workspace['S_q'] = S_q
         self.eng.workspace['S_l'] = S_l
-        self.eng.workspace['eps_vars'] = eps_vars
-        self.eng.workspace['eps_weights'] = eps_weights
+        self.eng.workspace['eps_vars_Eco'] = eps_vars_Eco
+        self.eng.workspace['eps_weights_Eco'] = eps_weights_Eco
         self.eng.workspace['y_lb_day'] = y_lb_day
         self.eng.workspace['y_ub_day'] = y_ub_day
         self.eng.workspace['y_lb_night'] = y_lb_night
@@ -397,9 +384,9 @@ class ModelPredictive(Controller):
         
         # Here call the matlab function to solve the MPC. UPDATE TO STATE_SPACE_JOINED
 
-        x0,u_pre,d_pre_fut = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
+        x_pre,u_pre,d_pre_fut = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
         
-        self.eng.workspace['x0'] = x0
+        self.eng.workspace['x_pre'] = x_pre
         self.eng.workspace['u_pre'] = u_pre
         self.eng.workspace['d_pre_fut'] = d_pre_fut
         self.eng.run('mpc_matlab.m', nargout=0)
