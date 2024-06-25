@@ -166,7 +166,7 @@ class ModelPredictive(Controller):
                                         Ex_new[m,n] = state_space.Ex[i,j]
             self.state_space_joined.set_A(A_new)
             self.state_space_joined.set_B(B_new)
-            self.state_space_joined.set_Ex(B_new)
+            self.state_space_joined.set_Ex(Ex_new)
             self.state_space_joined.x_offset = x_offset_new
 
             for i,y in enumerate(extended_y_previous):
@@ -180,6 +180,10 @@ class ModelPredictive(Controller):
                             for n,u_joined_match in enumerate(extended_u_joined):
                                 if u_match == u_joined_match:
                                     D_new[m,n] = state_space_joined_previous.D[i,j]
+                        for j,d_match in enumerate(extended_d_previous):
+                            for n,d_joined_match in enumerate(extended_d_joined):
+                                if d_match == d_joined_match:
+                                    Ey_new[m,n] = state_space_joined_previous.Ey[i,j]
             for i,y in enumerate(extended_y):
                 for m,y_joined in enumerate(extended_y_joined):
                     if y == y_joined:
@@ -294,6 +298,7 @@ class ModelPredictive(Controller):
         self.eng.workspace['Ex'] = self.state_space_joined.Ex
         self.eng.workspace['Ey'] = self.state_space_joined.Ey
         self.eng.workspace['y_offset'] = self.state_space_joined.y_offset
+        self.eng.workspace['x_offset'] = self.state_space_joined.x_offset
 
 
 

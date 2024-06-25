@@ -143,17 +143,18 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     D_i = 0
     E_i = 0
     SS_output.add_y(linear_regression.output)
-    SS_output.model_SS_x = linear_regression.output.source in model.controlled or ( isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name in [ c.source.col_name for c in model.controlled ] ))
+    SS_output.model_SS_x = ( linear_regression.output.source.col_name in [ input.source.name for input in linear_regression.inputs ] ) or ( isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name in [ input.source.col_name for input in linear_regression.inputs ] ))
     # C AND D SHOULDN'T BE CALCULATED IN THIS WAY, BUT USING EYE MATRICES TO STATES AND OUTPUTS.
     for f in linear_regression.inputs:
         if f.source in model.controlled:
             for i in range(0, f.lag):
                 coef = linear_regression.linear_model.coef_[0][total_i]
                 C[0][C_i] = coef
-                if linear_regression.output.source in model.controlled:
-                    A[0][C_i] = coef
-                elif isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name in [ c.source.col_name for c in model.controlled ] ):
-                    A[0][C_i] =  coef + 1
+                if SS_output.model_SS_x:
+                    if isinstance(linear_regression.output.source,Change):
+                        A[0][C_i] = coef + 1
+                    else:
+                        A[0][C_i] = coef
                 C_i += 1
                 total_i += 1
             SS_output.add_x(input=f,rm_1st_lag=False)
