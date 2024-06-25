@@ -38,7 +38,7 @@ class StateSpace(Predictor):
         print("C",self.state_space.C)
         print("D",self.state_space.D)
         print("y_offset",self.state_space.y_offset)
-        x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d
+        x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d + self.state_space.x_offset
         y = self.state_space.C @ x + self.state_space.D @ u + self.state_space.Ey @ d + self.state_space.y_offset
         return y
 

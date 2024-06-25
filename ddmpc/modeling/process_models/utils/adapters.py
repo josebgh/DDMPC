@@ -31,6 +31,7 @@ class StateSpace_ABCDE:
         self.Ex = np.zeros((0,0))
         self.Ey = np.zeros((0,0))
         self.y_offset = np.array([0.])
+        self.x_offset = np.array([0.])
         self.SS_x = list() # list of states (Input objects)
         self.rm_1st_lag_SS_x = list() # list of bools, which indicates if the first lag of the state should be removed. (Used when the state is a control variable)
         self.SS_d = list() # list of disturbances (Input objects)
@@ -62,6 +63,13 @@ class StateSpace_ABCDE:
             self.y_offset = np.append(self.y_offset, y_offset)
         else:
             self.y_offset[pos] = y_offset
+
+    def set_x_offset(self, x_offset: np.ndarray, pos:int=0):
+        for i in range(len(x_offset)):
+            if pos+i > len(self.x_offset)-1:
+                self.x_offset = np.append(self.x_offset, x_offset[i])
+            else:
+                self.x_offset[pos+i] = x_offset[i]
 
     def add_x(self, input : Input, rm_1st_lag:bool=False):
         self.SS_x.append(input)
@@ -134,7 +142,6 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     C_i = 0
     D_i = 0
     E_i = 0
-    SS_output.set_y_offset(linear_regression.linear_model.intercept_)
     SS_output.add_y(linear_regression.output)
     SS_output.model_SS_x = linear_regression.output.source in model.controlled or ( isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name in [ c.source.col_name for c in model.controlled ] ))
     # C AND D SHOULDN'T BE CALCULATED IN THIS WAY, BUT USING EYE MATRICES TO STATES AND OUTPUTS.
@@ -189,6 +196,12 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     SS_output.set_D(D)
     SS_output.set_Ex(Ex)
     SS_output.set_Ey(Ey)
+    
+    SS_output.set_y_offset(linear_regression.linear_model.intercept_)
+    x_offset = np.zeros([SS_output.get_nx()])
+    if SS_output.model_SS_x:
+        x_offset[0] = linear_regression.linear_model.intercept_
+    SS_output.set_x_offset(x_offset)
 
     return SS_output
 

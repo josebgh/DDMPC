@@ -73,6 +73,7 @@ class ModelPredictive(Controller):
                 if not_in:
                     self.state_space_joined.add_x(input=f,rm_1st_lag=rm)
 
+
             # Obtain all u features
             for f in state_space.SS_u:
                 not_in = True
@@ -104,7 +105,7 @@ class ModelPredictive(Controller):
                     self.state_space_joined.add_y(input=f)
                     self.state_space_joined.set_y_offset(y_offset=y_offset,pos=np.inf)
             
-            # Recalculate the state space matrix A
+            # Recalculate the state space matrices
             extended_x_joined = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)
             extended_x_previous = state_space_joined_previous.get_extended_vector(vector=state_space_joined_previous.SS_x,rm_1st_lag=state_space_joined_previous.rm_1st_lag_SS_x)
             extended_x = state_space.get_extended_vector(vector=state_space.SS_x,rm_1st_lag=state_space.rm_1st_lag_SS_x)
@@ -128,6 +129,7 @@ class ModelPredictive(Controller):
             D_new = np.zeros((ny_joined,nu_joined))
             Ex_new = np.zeros((nx_joined,nd_joined))
             Ey_new = np.zeros((ny_joined,nd_joined))
+            x_offset_new = np.zeros([nx_joined])
 
             for i,x in enumerate(extended_x_previous):
                 for m,x_joined in enumerate(extended_x_joined):
@@ -136,6 +138,7 @@ class ModelPredictive(Controller):
                             for n,x_joined_match in enumerate(extended_x_joined):
                                 if x_match == x_joined_match:
                                     A_new[m,n] = state_space_joined_previous.A[i,j]
+                                    x_offset_new[m] = state_space_joined_previous.x_offset[i]
                         for j,u_match in enumerate(extended_u_previous):
                             for n,u_joined_match in enumerate(extended_u_joined):
                                 if u_match == u_joined_match:
@@ -152,6 +155,7 @@ class ModelPredictive(Controller):
                                 for n,x_joined_match in enumerate(extended_x_joined):
                                     if x_match == x_joined_match:
                                         A_new[m,n] = state_space.A[i,j]
+                                        x_offset_new[m] = state_space_joined_previous.x_offset[i]
                             for j,u_match in enumerate(extended_u):
                                 for n,u_joined_match in enumerate(extended_u_joined):
                                     if u_match == u_joined_match:
@@ -163,6 +167,7 @@ class ModelPredictive(Controller):
             self.state_space_joined.set_A(A_new)
             self.state_space_joined.set_B(B_new)
             self.state_space_joined.set_Ex(B_new)
+            self.state_space_joined.x_offset = x_offset_new
 
             for i,y in enumerate(extended_y_previous):
                 for m,y_joined in enumerate(extended_y_joined):
