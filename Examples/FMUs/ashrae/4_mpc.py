@@ -99,5 +99,4 @@ for repetition in range(5):  # Start online learning loop
     TAirRoom_predictor_SS = StateSpace(state_space=lr2ss(linear_regression = TAirRoom_predictor, model=model) , linear_regression = TAirRoom_predictor)
     Q_flowAhu_predictor_SS = StateSpace(state_space=lr2ss(linear_regression = Q_flowAhu_predictor, model=model) , linear_regression = Q_flowAhu_predictor)
 
-
 dh.save("mpc_data", override=True) # save results

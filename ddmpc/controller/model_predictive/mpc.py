@@ -53,87 +53,147 @@ class ModelPredictive(Controller):
         '''
         if state_spaces is None:
             state_spaces = self.state_spaces
-        self.state_spaces = state_spaces
-
-        #OJO QUE ESTAMOS TENIENDO EN CUENTA QUE ES PARA LOS 
-        #REGRESORES, DONDE SIEMPRE SE TIENE A COMO EYE Y B COMO ZEROS.
+        self.state_spaces = state_spaces.copy()
 
         self.state_space_joined = StateSpace_ABCDE()
+        self.state_space_joined = copy.deepcopy(self.state_spaces[0])
+        self.state_spaces.pop(0)
+        
         for (n,state_space) in enumerate(self.state_spaces):
-            if n == 0:
-                self.state_space_joined = copy.deepcopy(state_space)
-            else:
 
-                # Add y features
-                self.state_space_joined.add_y(state_space.SS_y[0])
-                self.state_space_joined.set_y_offset(state_space.y_offset[0],len(state_space.y_offset))
+            state_space_joined_previous = copy.deepcopy(self.state_space_joined)
 
-                #Add x features
-                nx_added = 0
-                for x in state_space.get_extended_vector(state_space.SS_x):
-                    if x not in self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x):
-                        nx_added+=1
-                        for (i,f) in enumerate(self.state_space_joined.SS_x):
-                            if f.name == x[0]:
-                                self.state_space_joined.SS_x[i].lag = max(self.state_space_joined.SS_x[i].lag, x[1])
-                        A_new = np.eye(1+self.state_space_joined.A.shape[0])
-                        self.state_space_joined.set_A(A_new)
-                        B_new = np.zeros((self.state_space_joined.B.shape[0]+1,self.state_space_joined.B.shape[1]))
-                        self.state_space_joined.set_B(B_new)
+            # Obtain all x features
+            for rm,f in zip(state_space.rm_1st_lag_SS_x,state_space.SS_x):
+                not_in = True
+                for i,f_joined in enumerate(self.state_space_joined.SS_x):
+                    if f.name == f_joined.name:
+                        self.state_space_joined.SS_x[i].lag = max(f_joined.lag, f.lag)
+                        not_in = False
+                if not_in:
+                    self.state_space_joined.add_x(input=f,rm_1st_lag=rm)
 
-                C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]+nx_added))
-                if nx_added>0:
-                    C_new[:-1,:-nx_added] = self.state_space_joined.C
-                else:
-                    C_new[:-1,:] = self.state_space_joined.C
-                for (i,x) in enumerate(state_space.get_extended_vector(state_space.SS_x)):
-                    for (j,x_joined) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x)):
-                        if x==x_joined:
-                            C_new[-1,j] = state_space.C[0,i]
-                self.state_space_joined.set_C(C_new)
+            # Obtain all u features
+            for f in state_space.SS_u:
+                not_in = True
+                for i,f_joined in enumerate(self.state_space_joined.SS_u):
+                    if f.name == f_joined.name:
+                        self.state_space_joined.SS_u[i].lag = max(f_joined.lag, f.lag)
+                        not_in = False
+                if not_in:
+                    self.state_space_joined.add_u(input=f)
 
-                # Add u features
-                nu_added = 0
-                for u in state_space.get_extended_vector(state_space.SS_u):
-                    if u not in self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u):
-                        nu_added+=1
-                        for (i,f) in enumerate(self.state_space_joined.SS_u):
-                            if f.name == u[0]:
-                                self.state_space_joined.SS_u[i].lag = max(self.state_space_joined.SS_u[i].lag, u[1])
-                        B_new = np.zeros((self.state_space_joined.B.shape[0],self.state_space_joined.B.shape[1]+1))
-                        self.state_space_joined.set_B(B_new)
+            # Obtain all d features
+            for f in state_space.SS_d:
+                not_in = True
+                for i,f_joined in enumerate(self.state_space_joined.SS_d):
+                    if f.name == f_joined.name:
+                        self.state_space_joined.SS_d[i].lag = max(f_joined.lag, f.lag)
+                        not_in = False
+                if not_in:
+                    self.state_space_joined.add_d(input=f)
 
-                D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]+nu_added))
-                if nx_added>0:
-                    D_new[:-1,:-nu_added] = self.state_space_joined.D
-                else:
-                    D_new[:-1,:] = self.state_space_joined.D
-                for (i,u) in enumerate(state_space.get_extended_vector(state_space.SS_u)):
-                    for (j,u_joined) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u)):
-                        if u==u_joined:
-                            D_new[-1,j] = state_space.D[0,i]
-                self.state_space_joined.set_D(D_new)
-                        
-                # Add d features
-                nd_added = 0
-                for d in state_space.get_extended_vector(state_space.SS_d):
-                    if d not in self.state_space_joined.get_extended_vector(self.state_space_joined.SS_d):
-                        nd_added+=1
-                        for (i,f) in enumerate(self.state_space_joined.SS_d):
-                            if f.name == d[0]:
-                                self.state_space_joined.SS_d[i].lag = max(self.state_space_joined.SS_d[i].lag, d[1])
+            # Obtain all y features
+            for f,y_offset in zip(state_space.SS_y,state_space.y_offset):
+                not_in = True
+                for i,f_joined in enumerate(self.state_space_joined.SS_y):
+                    if f.name == f_joined.name:
+                        self.state_space_joined.SS_y[i].lag = max(f_joined.lag, f.lag)
+                        not_in = False
+                if not_in:
+                    self.state_space_joined.add_y(input=f)
+                    self.state_space_joined.set_y_offset(y_offset=y_offset,pos=np.inf)
+            
+            # Recalculate the state space matrix A
+            extended_x_joined = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)
+            extended_x_previous = state_space_joined_previous.get_extended_vector(vector=state_space_joined_previous.SS_x,rm_1st_lag=state_space_joined_previous.rm_1st_lag_SS_x)
+            extended_x = state_space.get_extended_vector(vector=state_space.SS_x,rm_1st_lag=state_space.rm_1st_lag_SS_x)
+            extended_y_joined = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_y)
+            extended_y_previous = state_space_joined_previous.get_extended_vector(vector=state_space_joined_previous.SS_y)
+            extended_y = state_space.get_extended_vector(vector=state_space.SS_y)
+            extended_u_joined = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_u,isoutputs=True)
+            extended_u_previous = state_space_joined_previous.get_extended_vector(vector=state_space_joined_previous.SS_u,isoutputs=True)
+            extended_u = state_space.get_extended_vector(vector=state_space.SS_u,isoutputs=True)
+            extended_d_joined = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_d)
+            extended_d_previous = state_space_joined_previous.get_extended_vector(vector=state_space_joined_previous.SS_d)
+            extended_d = state_space.get_extended_vector(vector=state_space.SS_d)
 
-                E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]+nd_added))
-                if nd_added>0:
-                    E_new[:-1,:-nd_added] = self.state_space_joined.E
-                else:
-                    E_new[:-1,:] = self.state_space_joined.E
-                for (i,d) in enumerate(state_space.get_extended_vector(state_space.SS_d)):
-                    for (j,d_joined) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_d)):
-                        if d==d_joined:
-                            E_new[-1,j] = state_space.E[0,i]
-                self.state_space_joined.set_E(E_new)
-                
+            nx_joined = len(extended_x_joined)
+            ny_joined = len(extended_y_joined)
+            nu_joined = len(extended_u_joined)
+            nd_joined = len(extended_d_joined)
+            A_new = np.zeros((nx_joined,nx_joined))
+            C_new = np.zeros((ny_joined,nx_joined))
+            B_new = np.zeros((nx_joined,nu_joined))
+            D_new = np.zeros((ny_joined,nu_joined))
+            Ex_new = np.zeros((nx_joined,nd_joined))
+            Ey_new = np.zeros((ny_joined,nd_joined))
+
+            for i,x in enumerate(extended_x_previous):
+                for m,x_joined in enumerate(extended_x_joined):
+                    if x == x_joined:
+                        for j,x_match in enumerate(extended_x_previous):
+                            for n,x_joined_match in enumerate(extended_x_joined):
+                                if x_match == x_joined_match:
+                                    A_new[m,n] = state_space_joined_previous.A[i,j]
+                        for j,u_match in enumerate(extended_u_previous):
+                            for n,u_joined_match in enumerate(extended_u_joined):
+                                if u_match == u_joined_match:
+                                    B_new[m,n] = state_space_joined_previous.B[i,j]
+                        for j,d_match in enumerate(extended_d_previous):
+                            for n,d_joined_match in enumerate(extended_d_joined):
+                                if d_match == d_joined_match:
+                                    Ex_new[m,n] = state_space_joined_previous.Ex[i,j]
+            if state_space.model_SS_x:                        
+                for i,x in enumerate(extended_x):
+                    for m,x_joined in enumerate(extended_x_joined):
+                        if x == x_joined:
+                            for j,x_match in enumerate(extended_x):
+                                for n,x_joined_match in enumerate(extended_x_joined):
+                                    if x_match == x_joined_match:
+                                        A_new[m,n] = state_space.A[i,j]
+                            for j,u_match in enumerate(extended_u):
+                                for n,u_joined_match in enumerate(extended_u_joined):
+                                    if u_match == u_joined_match:
+                                        B_new[m,n] = state_space.B[i,j]
+                            for j,d_match in enumerate(extended_d):
+                                for n,d_joined_match in enumerate(extended_d_joined):
+                                    if d_match == d_joined_match:
+                                        Ex_new[m,n] = state_space.Ex[i,j]
+            self.state_space_joined.set_A(A_new)
+            self.state_space_joined.set_B(B_new)
+            self.state_space_joined.set_Ex(B_new)
+
+            for i,y in enumerate(extended_y_previous):
+                for m,y_joined in enumerate(extended_y_joined):
+                    if y == y_joined:
+                        for j,x_match in enumerate(extended_x_previous):
+                            for n,x_joined_match in enumerate(extended_x_joined):
+                                if x_match == x_joined_match:
+                                    C_new[m,n] = state_space_joined_previous.C[i,j]
+                        for j,u_match in enumerate(extended_u_previous):
+                            for n,u_joined_match in enumerate(extended_u_joined):
+                                if u_match == u_joined_match:
+                                    D_new[m,n] = state_space_joined_previous.D[i,j]
+            for i,y in enumerate(extended_y):
+                for m,y_joined in enumerate(extended_y_joined):
+                    if y == y_joined:
+                        for j,x_match in enumerate(extended_x):
+                            for n,x_joined_match in enumerate(extended_x_joined):
+                                if x_match == x_joined_match:
+                                    C_new[m,n] = state_space.C[i,j]
+                        for j,u_match in enumerate(extended_u):
+                            for n,u_joined_match in enumerate(extended_u_joined):
+                                if u_match == u_joined_match:
+                                    D_new[m,n] = state_space.D[i,j]
+                        for j,d_match in enumerate(extended_d):
+                            for n,d_joined_match in enumerate(extended_d_joined):
+                                if d_match == d_joined_match:
+                                    Ey_new[m,n] = state_space.Ey[i,j]
+            self.state_space_joined.set_C(C_new)
+            self.state_space_joined.set_D(D_new)
+            self.state_space_joined.set_Ey(Ey_new)
+            
 
 
         # Set the objective functions in the workspace
@@ -146,7 +206,7 @@ class ModelPredictive(Controller):
             else:
                 if isinstance(objective.feature, Control):
                     # Convertir una y que apunte a la variable de control
-                    for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u)):
+                    for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u,isoutputs=True)):
                         if u == (objective.feature.source.read_name,0):
                             y_new = copy.deepcopy(self.state_space_joined.SS_u[i])
                             y_new.lag = 1
@@ -159,12 +219,12 @@ class ModelPredictive(Controller):
                             D_new[:-1,:] = self.state_space_joined.D
                             D_new[-1,i] = 1
                             self.state_space_joined.set_D(D_new)
-                            E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]))
-                            E_new[:-1,:] = self.state_space_joined.E
-                            self.state_space_joined.set_E(E_new)
+                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                            Ey_new[:-1,:] = self.state_space_joined.Ey
+                            self.state_space_joined.set_Ey(Ey_new)
                 elif  isinstance(objective.feature, Controlled):
                     # Convertir una y que apunte a la variable de estado
-                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x)):
+                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)):
                         if x == (objective.feature.source.read_name,0):
                             y_new = copy.deepcopy(self.state_space_joined.SS_x[i])
                             y_new.lag = 1
@@ -177,16 +237,16 @@ class ModelPredictive(Controller):
                             D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
                             D_new[:-1,:] = self.state_space_joined.D
                             self.state_space_joined.set_D(D_new)
-                            E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]))
-                            E_new[:-1,:] = self.state_space_joined.E
-                            self.state_space_joined.set_E(E_new)
+                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                            Ey_new[:-1,:] = self.state_space_joined.Ey
+                            self.state_space_joined.set_Ey(Ey_new)
 
                 elif isinstance(objective.feature, Connection):
                     y_new = copy.deepcopy(objective.feature.source)
                     self.state_space_joined.add_y(y_new)
                     self.state_space_joined.set_y_offset(0.,len(self.state_space_joined.y_offset))
                     # Convertir un y que apunte al incremento de la variable de estado o acción de control
-                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x)):
+                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)):
                         if x == (objective.feature.source.base.col_name,0):
                             C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
                             C_new[:-1,:] = self.state_space_joined.C
@@ -196,10 +256,10 @@ class ModelPredictive(Controller):
                             D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
                             D_new[:-1,:] = self.state_space_joined.D
                             self.state_space_joined.set_D(D_new)
-                            E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]))
-                            E_new[:-1,:] = self.state_space_joined.E
-                            self.state_space_joined.set_E(E_new)
-                    for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u)):
+                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                            Ey_new[:-1,:] = self.state_space_joined.Ey
+                            self.state_space_joined.set_Ey(Ey_new)
+                    for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u,isoutputs=True)):
                         if u == (objective.feature.source.base.col_name,0):
                             C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
                             C_new[:-1,:] = self.state_space_joined.C
@@ -207,11 +267,13 @@ class ModelPredictive(Controller):
                             D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
                             D_new[:-1,:] = self.state_space_joined.D
                             D_new[-1,i] = 1
-                            D_new[-1,i+1] = -1
+                            u_prev = (u[0],1)
+                            pos_prev_u = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x).index(u_prev)
+                            C_new[-1,pos_prev_u] = -1
                             self.state_space_joined.set_D(D_new)
-                            E_new = np.zeros((self.state_space_joined.E.shape[0]+1,self.state_space_joined.E.shape[1]))
-                            E_new[:-1,:] = self.state_space_joined.E
-                            self.state_space_joined.set_E(E_new)
+                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                            Ey_new[:-1,:] = self.state_space_joined.Ey
+                            self.state_space_joined.set_Ey(Ey_new)
                 else:
                     raise ValueError(f"Objective {objective} feature is not Control, Controlled or Change")
                 
@@ -224,8 +286,8 @@ class ModelPredictive(Controller):
         self.eng.workspace['B'] = self.state_space_joined.B
         self.eng.workspace['C'] = self.state_space_joined.C
         self.eng.workspace['D'] = self.state_space_joined.D
-        self.eng.workspace['E'] = self.state_space_joined.E
-        print("y_offset",self.state_space_joined.y_offset)
+        self.eng.workspace['Ex'] = self.state_space_joined.Ex
+        self.eng.workspace['Ey'] = self.state_space_joined.Ey
         self.eng.workspace['y_offset'] = self.state_space_joined.y_offset
 
 
@@ -236,7 +298,7 @@ class ModelPredictive(Controller):
 
         x_lb = np.zeros((self.state_space_joined.get_nx(),1))
         x_ub = np.zeros((self.state_space_joined.get_nx(),1))
-        x_extended = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x)
+        x_extended = self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)
         for i in range(self.state_space_joined.get_nx()):
             if x_extended[i][0] in constraints.keys():
                 x_lb[i] = constraints[x_extended[i][0]][0]
@@ -250,7 +312,7 @@ class ModelPredictive(Controller):
 
         u_lb = np.zeros((self.state_space_joined.get_nu(),1))
         u_ub = np.zeros((self.state_space_joined.get_nu(),1))
-        u_extended = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u)
+        u_extended = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u,isoutputs=True)
         for i in range(self.state_space_joined.get_nu()):
             if u_extended[i][0] in constraints.keys():
                 u_lb[i] = constraints[u_extended[i][0]][0]
@@ -299,7 +361,7 @@ class ModelPredictive(Controller):
         eps_vars_Eco = np.zeros((1,ny))
         eps_weights_Eco = np.zeros((ny,ny))
         eps_vars_AbsLin = np.zeros((1,ny))
-        eps_weights_AbsLin = np.zeros((ny,ny))
+        eps_weights_AbsLin = np.zeros((1,ny))
         day_hours = np.array([0,24])
         y_ref_day = np.zeros((1,ny))
         y_ref_night = np.zeros((1,ny))
@@ -311,9 +373,7 @@ class ModelPredictive(Controller):
                             eps_vars_Eco[0,i] = 1
                             eps_weights_Eco[i,i] = objective.cost.weight
                             for controlled in self.nlp.model.controlled:
-                                print(f"{controlled.source.col_name} == {objective.feature.source.col_name}")
                                 if controlled.source.col_name == objective.feature.source.col_name:
-                                    print(controlled.source.name)
                                     y_lb_day[i] = controlled.mode.day_lb
                                     y_ub_day[i] = controlled.mode.day_ub
                                     y_lb_night[i] = controlled.mode.night_lb
@@ -327,7 +387,7 @@ class ModelPredictive(Controller):
                             elif isinstance(objective.cost, AbsoluteLinear):
                                 # S_l[0,i] = objective.cost.weight
                                 eps_vars_AbsLin[0,i] = 1
-                                eps_weights_AbsLin[i,i] = objective.cost.weight
+                                eps_weights_AbsLin[0,i] = objective.cost.weight
                                 y_ref_day[0,i] = objective.feature.mode.day_target
                                 y_ref_night[0,i] = objective.feature.mode.night_target
                 else:
@@ -337,7 +397,7 @@ class ModelPredictive(Controller):
                 for i,y in enumerate(self.state_space_joined.SS_y):
                     if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
                         eps_vars_AbsLin[0,i] = 1
-                        eps_weights_AbsLin[i,i] = objective.cost.weight
+                        eps_weights_AbsLin[0,i] = objective.cost.weight
             elif isinstance(objective.cost, Quadratic):
                 S_q[i,i] = objective.cost.weight
             else:
@@ -355,6 +415,11 @@ class ModelPredictive(Controller):
         self.eng.workspace['y_lb_night'] = y_lb_night
         self.eng.workspace['y_ub_night'] = y_ub_night
         self.eng.workspace['day_hours'] = day_hours
+        self.eng.workspace['eps_vars_AbsLin'] = eps_vars_AbsLin
+        self.eng.workspace['eps_weights_AbsLin'] = eps_weights_AbsLin
+        self.eng.workspace['y_ref_day'] = y_ref_day
+        self.eng.workspace['y_ref_night'] = y_ref_night
+
 
 
 
@@ -384,11 +449,11 @@ class ModelPredictive(Controller):
         
         # Here call the matlab function to solve the MPC. UPDATE TO STATE_SPACE_JOINED
 
-        x_pre,u_pre,d_pre_fut = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
+        x0,u_pre,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
         
-        self.eng.workspace['x_pre'] = x_pre
+        self.eng.workspace['x0'] = x0
         self.eng.workspace['u_pre'] = u_pre
-        self.eng.workspace['d_pre_fut'] = d_pre_fut
+        self.eng.workspace['d_full'] = d_full
         self.eng.run('mpc_matlab.m', nargout=0)
 
 
