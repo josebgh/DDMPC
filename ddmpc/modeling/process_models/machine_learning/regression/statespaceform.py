@@ -30,5 +30,8 @@ class StateSpace(Predictor):
         y = self.state_space.C @ x + self.state_space.D @ u + self.state_space.Ey @ d + self.state_space.y_offset
         x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d + self.state_space.x_offset
         print(y)
+        #for some reason the matrices C and Ey of the Q_flowAhu_predictor_SS have terms inverted:
+        # good behavior (old SS): [MX((-0.312072+(((-0.0632949*Room Temperature[+0])+(-0.0696445*AHU SetPoint[+0]))+(0.133951*Outside Temperature[+0]))))]
+        #bad behavior (new SS):  [MX((-0.312072+(((-0.0696445*Room Temperature[+0])+(0.133951*AHU SetPoint[+0]))+(-0.0632949*Outside Temperature[+0]))))]
         return y
 
