@@ -61,6 +61,7 @@ class ModelPredictive(Controller):
         
         for (n,state_space) in enumerate(self.state_spaces):
 
+            state_space = copy.deepcopy(state_space)
             state_space_joined_previous = copy.deepcopy(self.state_space_joined)
 
             # Obtain all x features
