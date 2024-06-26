@@ -6,11 +6,9 @@ nx = size(A,1);
 nu = size(B,2);
 nd = size(Ex,2);
 ny = size(C,1);
-N = length(d_full);
 
 % dynamic variables
 x0 = sdpvar(nx,1,'full');
-u_pre = sdpvar(nu,1,'full');
 d_full = sdpvar(nd*ones(1,N),ones(1,N),'full');
 
 x = sdpvar(nx*ones(1,N+1),ones(1,N+1),'full');
@@ -61,15 +59,15 @@ for k=1:N
     end
 
     % Constraints (y constraints alredy in Controlled Economic cost)
-    for i=1:length(x{k})
-        constr = constr + [ x_lb(i) <= x{k}(i) ];
-        constr = constr + [ x{k}(i) <= x_ub(i) ];
-    end
-
-    for i=1:length(u{k})
-        constr = constr + [ u_lb(i) <= u{k}(i) ];
-        constr = constr + [ u{k}(i) <= u_ub(i) ];
-    end
+    % for i=1:length(x{k})
+    %     constr = constr + [ x_lb(i) <= x{k}(i) ];
+    %     constr = constr + [ x{k}(i) <= x_ub(i) ];
+    % end
+    % 
+    % for i=1:length(u{k})
+    %     constr = constr + [ u_lb(i) <= u{k}(i) ];
+    %     constr = constr + [ u{k}(i) <= u_ub(i) ];
+    % end
     
     % System
     constr = constr + [ x{k+1} == A*x{k} + B*u{k} + Ex*d{k} + x_offset' ];
@@ -78,11 +76,11 @@ for k=1:N
 end
     
 % Create MPC object
-% options = sdpsettings('solver','quadprog','verbose',1);
-options = sdpsettings('solver','gurobi','verbose',1);
+options = sdpsettings('solver','quadprog','verbose',1);
+% options = sdpsettings('solver','gurobi','verbose',1);
 % options = sdpsettings('solver','fmincon','verbose',1);
 % options = sdpsettings('solver','','verbose',1);
 
 MPCcontrol = optimizer(constr,cost,options,...
-      {x0,[d{:}],[y_ref{:}],[y_lb{:}],[y_ub{:}],u_pre},...
+      {x0,[d{:}],[y_ref{:}],[y_lb{:}],[y_ub{:}]},...
       {[x{:}],[u{:}],cost});

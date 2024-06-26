@@ -68,7 +68,7 @@ for repetition in range(5):  # Start online learning loop
     )
 
     ThermalZone_MPC.setupMatlab(
-        state_spaces = [TAirRoom_predictor_SS.state_space]
+        state_spaces = [TAirRoom_predictor_SS.state_space, Q_flowAhu_predictor_SS.state_space]
         # state_spaces = [TAirRoom_predictor_SS.state_space, Q_flowAhu_predictor_SS.state_space],
     )
 

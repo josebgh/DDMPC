@@ -1,4 +1,5 @@
 from typing import Union, Callable, Optional
+import copy
 
 import numpy as np
 import casadi as ca
@@ -305,29 +306,51 @@ def par_vals2SSvectors(par_vals: list, par_ids: list, state_space: StateSpace_AB
     nd = state_space.get_nd()
 
     x0 = list()
-    for f in state_space.SS_x:
-        for i in range(-f.lag,0):
-            key = (f.source.col_name, i+1)
-            x0.append(par_dict[key])
-            
-    u_pre = list()
-    for f in state_space.SS_u:
-        for i in range(-f.lag,-1):
-            key = (f.source.col_name, i+1)
-            u_pre.append(par_dict[key])
-    
+    for x in  state_space.get_extended_vector(vector=state_space.SS_x,rm_1st_lag=state_space.rm_1st_lag_SS_x):
+        key = (x[0],-x[1])
+        x0.append(par_dict[key])
+
+    # u_pre = list()
+    # for u in state_space.get_extended_vector(vector=state_space.SS_u,isoutputs=True):
+    #     key = (u[0],-u[1])
+    #     u_pre.append(par_dict[key])
+        
     d_full = [0] # first element is 0 in order to first append include a list in the list and not the values.
     j=0
     f = state_space.SS_d[0]
     while (f.source.col_name, j+1) in par_dict:
-        d = list()
-        for f in state_space.SS_d:
-            for i in range(-f.lag,0):
-                # print("f.lag",f.lag)
-                key = (f.source.col_name, i+1+j)
-                d.append(par_dict[key])
+        d_pre = list()
+        for d in state_space.get_extended_vector(vector=state_space.SS_d):
+            key = (d[0],-d[1]+j)
+            d_pre.append(par_dict[key])
         j+=1
-        d_full.append(d)
+        d_full.append(d_pre)
     d_full.pop(0) # remove the first element
+            
+    # for f in state_space.SS_x:
+    #     for i in range(-f.lag,0):
+    #         key = (f.source.col_name, i+1)
+    #         x0.append(par_dict[key])
+            
+    # u_pre = list()
+    # for f in state_space.SS_u:
+    #     for i in range(-f.lag,-1):
+    #         key = (f.source.col_name, i+1)
+    #         u_pre.append(par_dict[key])
     
-    return x0, u_pre, d_full
+    # d_full = [0] # first element is 0 in order to first append include a list in the list and not the values.
+    # j=0
+    # f = state_space.SS_d[0]
+    # while (f.source.col_name, j+1) in par_dict:
+    #     d = list()
+    #     for f in state_space.SS_d:
+    #         for i in range(-f.lag,0):
+    #             # print("f.lag",f.lag)
+    #             key = (f.source.col_name, i+1+j)
+    #             d.append(par_dict[key])
+    #     j+=1
+    #     d_full.append(d)
+    # d_full.pop(0) # remove the first element
+    
+    # return x0, u_pre, d_full
+    return x0, d_full

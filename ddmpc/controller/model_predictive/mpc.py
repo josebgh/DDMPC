@@ -434,13 +434,9 @@ class ModelPredictive(Controller):
         self.eng.workspace['eps_weights_AbsLin'] = eps_weights_AbsLin
         self.eng.workspace['y_ref_day'] = y_ref_day
         self.eng.workspace['y_ref_night'] = y_ref_night
+        self.eng.workspace['N'] = self.nlp.N
 
-
-
-
-                
-
-        
+        self.eng.run('mpc_matlab_setup.m', nargout=0)
 
 
     def __str__(self):
@@ -464,19 +460,24 @@ class ModelPredictive(Controller):
         
         # Here call the matlab function to solve the MPC. UPDATE TO STATE_SPACE_JOINED
 
-        x0,u_pre,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_spaces[0])
-        
+        # x0,u_pre,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
+        x0,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
         self.eng.workspace['x0'] = x0
-        self.eng.workspace['u_pre'] = u_pre
+        # self.eng.workspace['u_pre'] = u_pre
         self.eng.workspace['d_full'] = d_full
         self.eng.run('mpc_matlab.m', nargout=0)
-
+        u0 = self.eng.workspace['u0']
+        print(u0)
+        mpcsolve = self.eng.workspace['mpcsolve']
+        print("mpcsolve",mpcsolve)
+        self.eng.run('save_workspace.m', nargout=0)
 
         solution: NLPSolution = self.nlp.solve(self.par_vals)
 
         
         # retrieve the optimal controls
-        controls: dict[str, float] = solution.optimal_controls
+        # controls: dict[str, float] = solution.optimal_controls
+        controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0[0][0], self.state_space_joined.SS_u[1].name: u0[1][0]}
 
         additional_info: dict[str, float] = {'success': solution.success, 'runtime': solution.runtime}
 
