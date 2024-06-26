@@ -158,7 +158,8 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
                 C_i += 1
                 total_i += 1
             SS_output.add_x(input=f,rm_1st_lag=False)
-    for f in linear_regression.inputs:
+    # FALTA INCLUIR METODO PAR ASEGURAR QUE LAS VARIABLES CONTROLLED SON LAS PRIMERAS EN EL SS.
+    # for f in linear_regression.inputs:
         if f.source in model.controlled:
             pass # we ensure that the controlled variables are the first ones in the state space model
         elif f.source in model.controls:
@@ -198,6 +199,7 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     SS_output.set_Ex(Ex)
     SS_output.set_Ey(Ey)
     
+
     SS_output.set_y_offset(linear_regression.linear_model.intercept_)
     x_offset = np.zeros([SS_output.get_nx()])
     if SS_output.model_SS_x:
