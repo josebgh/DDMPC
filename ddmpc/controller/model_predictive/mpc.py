@@ -286,6 +286,10 @@ class ModelPredictive(Controller):
                 else:
                     raise ValueError(f"Objective {objective} feature is not Control, Controlled or Change")
                 
+                # auxEy = self.state_space_joined.Ey[1][0].copy()
+                # auxD = self.state_space_joined.D[1][1].copy()
+                # self.state_space_joined.Ey[1][0] = auxD
+                # self.state_space_joined.D[1][1] = auxEy
                 
         if self.eng is None:
             self.eng = matlab.engine.start_matlab()

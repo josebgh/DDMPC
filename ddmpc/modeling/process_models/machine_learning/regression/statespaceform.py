@@ -27,7 +27,8 @@ class StateSpace(Predictor):
         if not isinstance(input_values, (list,np.ndarray)):
             raise ValueError("input_values has to be either a list or a np.ndarray")
         x, u, d = LRinputs2SSvectors(input_values, self.state_space, self.linear_regression)
-        x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d + self.state_space.x_offset
         y = self.state_space.C @ x + self.state_space.D @ u + self.state_space.Ey @ d + self.state_space.y_offset
+        x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d + self.state_space.x_offset
+        print(y)
         return y
 
