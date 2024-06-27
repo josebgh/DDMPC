@@ -7,7 +7,7 @@ end
 d_full = d_full_aux;
 
 % current_time and T is in seconds.
-time_samples = (current_time:T:current_time+(N-1)*T) + 1*60*60 - 24*60*60;
+time_samples = (current_time:T:current_time+(N-1)*T) + 1*60*60 - 4*24*60*60;
 time_samples_daily = mod(time_samples,full_day);
 time_samples_weekly = mod(time_samples,7*full_day);
 isDay = time_samples_daily>=day_seconds(1) & time_samples_daily<=day_seconds(2);

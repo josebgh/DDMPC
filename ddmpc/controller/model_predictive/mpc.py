@@ -472,6 +472,7 @@ class ModelPredictive(Controller):
             self.eng.run('save_workspace.m', nargout=0)
             self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
+        print("isWeekday:", self.eng.workspace['isWeekday'], "with current_time:", self.eng.workspace['current_time'])
         u0 = self.eng.workspace['u0']
         print(u0)
         # mpcsolve = self.eng.workspace['mpcsolve']
