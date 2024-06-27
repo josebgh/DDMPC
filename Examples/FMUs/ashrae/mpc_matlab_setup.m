@@ -2,6 +2,10 @@
 
 yalmip('clear')
 
+% auxiliar variables
+full_day = 24*60*60;
+day_seconds = day_hours*60*60;
+% states dimensions
 nx = size(A,1);
 nu = size(B,2);
 nd = size(Ex,2);
@@ -58,11 +62,14 @@ for k=1:N
         end
     end
 
-    % % % % % Constraints (y constraints alredy in Controlled Economic cost)
-    % % % % for i=1:length(x{k})
-    % % % %     constr = constr + [ x_lb(i) <= x{k}(i) ];
-    % % % %     constr = constr + [ x{k}(i) <= x_ub(i) ];
-    % % % % end
+    % Constraints (y constraints alredy in Controlled Economic cost)
+    if k>1
+        for i=1:length(x{k})
+            constr = constr + [ x_lb(i) <= x{k}(i) ];
+            % constr = constr + [ x_lb(i) <= x{k}(i) ];
+            constr = constr + [ x{k}(i) <= x_ub(i) ];
+        end
+    end
 
     for i=1:length(u{k})
         constr = constr + [ u_lb(i) <= u{k}(i) ];

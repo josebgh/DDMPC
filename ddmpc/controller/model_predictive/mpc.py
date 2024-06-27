@@ -378,8 +378,8 @@ class ModelPredictive(Controller):
         eps_vars_AbsLin = np.zeros((1,ny))
         eps_weights_AbsLin = np.zeros((1,ny))
         day_hours = np.array([0,24])
-        y_ref_day = np.zeros((1,ny))
-        y_ref_night = np.zeros((1,ny))
+        y_ref_day = np.zeros((ny,1))
+        y_ref_night = np.zeros((ny,1))
         for objective in self.nlp.objectives:
             if isinstance(objective.feature, Controlled):
                 if isinstance(objective.feature.mode, Economic):
@@ -403,8 +403,8 @@ class ModelPredictive(Controller):
                                 # S_l[0,i] = objective.cost.weight
                                 eps_vars_AbsLin[0,i] = 1
                                 eps_weights_AbsLin[0,i] = objective.cost.weight
-                                y_ref_day[0,i] = objective.feature.mode.day_target
-                                y_ref_night[0,i] = objective.feature.mode.night_target
+                                y_ref_day[i,0] = objective.feature.mode.day_target
+                                y_ref_night[i,0] = objective.feature.mode.night_target
                 else:
                     raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                                 f'for Objective {objective}.')
@@ -466,9 +466,11 @@ class ModelPredictive(Controller):
         self.eng.workspace['x0'] = x0
         # self.eng.workspace['u_pre'] = u_pre
         self.eng.workspace['d_full'] = d_full
-        # if self.flag:
-        #     self.eng.run('save_workspace.m', nargout=0)
-        #     self.flag = False
+        self.eng.workspace['current_time'] = current_time
+        self.eng.workspace['T'] = self.step_size
+        if self.flag:
+            self.eng.run('save_workspace.m', nargout=0)
+            self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
         print(u0)
