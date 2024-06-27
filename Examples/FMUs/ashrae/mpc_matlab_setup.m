@@ -44,20 +44,20 @@ for k=1:N
         end
     end
     
-    % % % % % Quadratic Cost
-    % % % % cost = cost + [ ( y{k} - y_ref{k} )' * S_q * ( y{k} - y_ref{k} ) ];
-    % % % % 
-    % % % % % Absolute linear Cost
-    % % % % for i=1:length(y{k})
-    % % % %     if eps_vars_AbsLin(i)==1
-    % % % %         cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_1{k}(i) ];
-    % % % %         cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_2{k}(i) ];
-    % % % %         constr = constr + [ eps_AbsLin_1{k}(i) - eps_AbsLin_1{k}(i) == ( y{k}(i) - y_ref{k}(i) ) ];
-    % % % %         constr = constr + [ eps_AbsLin_1{k}(i) >= 0 ];
-    % % % %         constr = constr + [ eps_AbsLin_2{k}(i) >= 0 ];
-    % % % %     end
-    % % % % end
-    % % % % 
+    % % Quadratic Cost
+    % cost = cost + [ ( y{k} - y_ref{k} )' * S_q * ( y{k} - y_ref{k} ) ];
+
+    % Absolute linear Cost
+    for i=1:length(y{k})
+        if eps_vars_AbsLin(i)==1
+            cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_1{k}(i) ];
+            cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_2{k}(i) ];
+            constr = constr + [ eps_AbsLin_1{k}(i) - eps_AbsLin_2{k}(i) == ( y{k}(i) - y_ref{k}(i) ) ];
+            constr = constr + [ eps_AbsLin_1{k}(i) >= 0 ];
+            constr = constr + [ eps_AbsLin_2{k}(i) >= 0 ];
+        end
+    end
+
     % % % % % Constraints (y constraints alredy in Controlled Economic cost)
     % % % % for i=1:length(x{k})
     % % % %     constr = constr + [ x_lb(i) <= x{k}(i) ];

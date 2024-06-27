@@ -112,7 +112,6 @@ Q_flowAhu = Controlled(
     mode=Steady(day_target=0, night_target=0),
 )
 
-
 Q_flowTabs = Control(
     Readable(
         name="Heat Flow SetPoint",
