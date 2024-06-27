@@ -436,6 +436,7 @@ class ModelPredictive(Controller):
         self.eng.workspace['y_ref_night'] = y_ref_night
         self.eng.workspace['N'] = self.nlp.N
 
+        self.flag = True
         self.eng.run('mpc_matlab_setup.m', nargout=0)
 
 
@@ -465,12 +466,15 @@ class ModelPredictive(Controller):
         self.eng.workspace['x0'] = x0
         # self.eng.workspace['u_pre'] = u_pre
         self.eng.workspace['d_full'] = d_full
+        # if self.flag:
+        #     self.eng.run('save_workspace.m', nargout=0)
+        #     self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
         print(u0)
-        mpcsolve = self.eng.workspace['mpcsolve']
-        print("mpcsolve",mpcsolve)
-        self.eng.run('save_workspace.m', nargout=0)
+        # mpcsolve = self.eng.workspace['mpcsolve']
+        # print("mpcsolve",mpcsolve)
+        # self.eng.run('save_workspace.m', nargout=0)
 
         solution: NLPSolution = self.nlp.solve(self.par_vals)
 

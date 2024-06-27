@@ -44,30 +44,30 @@ for k=1:N
         end
     end
     
-    % Quadratic Cost
-    cost = cost + [ ( y{k} - y_ref{k} )' * S_q * ( y{k} - y_ref{k} ) ];
+    % % % % % Quadratic Cost
+    % % % % cost = cost + [ ( y{k} - y_ref{k} )' * S_q * ( y{k} - y_ref{k} ) ];
+    % % % % 
+    % % % % % Absolute linear Cost
+    % % % % for i=1:length(y{k})
+    % % % %     if eps_vars_AbsLin(i)==1
+    % % % %         cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_1{k}(i) ];
+    % % % %         cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_2{k}(i) ];
+    % % % %         constr = constr + [ eps_AbsLin_1{k}(i) - eps_AbsLin_1{k}(i) == ( y{k}(i) - y_ref{k}(i) ) ];
+    % % % %         constr = constr + [ eps_AbsLin_1{k}(i) >= 0 ];
+    % % % %         constr = constr + [ eps_AbsLin_2{k}(i) >= 0 ];
+    % % % %     end
+    % % % % end
+    % % % % 
+    % % % % % Constraints (y constraints alredy in Controlled Economic cost)
+    % % % % for i=1:length(x{k})
+    % % % %     constr = constr + [ x_lb(i) <= x{k}(i) ];
+    % % % %     constr = constr + [ x{k}(i) <= x_ub(i) ];
+    % % % % end
 
-    % Absolute linear Cost
-    for i=1:length(y{k})
-        if eps_vars_AbsLin(i)==1
-            cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_1{k}(i) ];
-            cost = cost + [ eps_weights_AbsLin(i) * eps_AbsLin_2{k}(i) ];
-            constr = constr + [ eps_AbsLin_1{k}(i) - eps_AbsLin_1{k}(i) == ( y{k}(i) - y_ref{k}(i) ) ];
-            constr = constr + [ eps_AbsLin_1{k}(i) >= 0 ];
-            constr = constr + [ eps_AbsLin_2{k}(i) >= 0 ];
-        end
+    for i=1:length(u{k})
+        constr = constr + [ u_lb(i) <= u{k}(i) ];
+        constr = constr + [ u{k}(i) <= u_ub(i) ];
     end
-
-    % Constraints (y constraints alredy in Controlled Economic cost)
-    % for i=1:length(x{k})
-    %     constr = constr + [ x_lb(i) <= x{k}(i) ];
-    %     constr = constr + [ x{k}(i) <= x_ub(i) ];
-    % end
-    % 
-    % for i=1:length(u{k})
-    %     constr = constr + [ u_lb(i) <= u{k}(i) ];
-    %     constr = constr + [ u{k}(i) <= u_ub(i) ];
-    % end
     
     % System
     constr = constr + [ x{k+1} == A*x{k} + B*u{k} + Ex*d{k} + x_offset' ];
