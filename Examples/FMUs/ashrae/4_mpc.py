@@ -34,7 +34,7 @@ ThermalZone_MPC = ModelPredictive(
     step_size=one_minute * 15,
     nlp=NLP(
         model=model,
-        N=32,
+        N=32*3,
         objectives=[
             #Here we need to differentiate between x, u, d and y. We need to define the state space model
             Objective(feature=TAirRoom, cost=Quadratic(weight=100)),

@@ -437,7 +437,8 @@ class ModelPredictive(Controller):
         self.eng.workspace['N'] = self.nlp.N
 
         self.flag = True
-        self.eng.run('mpc_matlab_setup.m', nargout=0)
+        # self.eng.run('mpc_matlab_setup.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
 
     def __str__(self):
@@ -464,7 +465,6 @@ class ModelPredictive(Controller):
         # x0,u_pre,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
         x0,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
         self.eng.workspace['x0'] = x0
-        # self.eng.workspace['u_pre'] = u_pre
         self.eng.workspace['d_full'] = d_full
         self.eng.workspace['current_time'] = current_time
         self.eng.workspace['T'] = self.step_size
@@ -472,9 +472,9 @@ class ModelPredictive(Controller):
             self.eng.run('save_workspace.m', nargout=0)
             self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
-        print("isWeekday:", self.eng.workspace['isWeekday'], "with current_time:", self.eng.workspace['current_time'])
         u0 = self.eng.workspace['u0']
         print(u0)
+        print("self.eng.workspace['current_time']/60/60/24",self.eng.workspace['current_time']/60/60/24)
         # mpcsolve = self.eng.workspace['mpcsolve']
         # print("mpcsolve",mpcsolve)
         # self.eng.run('save_workspace.m', nargout=0)
