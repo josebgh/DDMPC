@@ -414,7 +414,9 @@ class ModelPredictive(Controller):
                         eps_vars_AbsLin[0,i] = 1
                         eps_weights_AbsLin[0,i] = objective.cost.weight
             elif isinstance(objective.cost, Quadratic):
-                S_q[i,i] = objective.cost.weight
+                for i,y in enumerate(self.state_space_joined.SS_y):
+                    if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
+                        S_q[i,i] = objective.cost.weight
             else:
                 raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                             f'for Objective {objective}.')
@@ -438,7 +440,8 @@ class ModelPredictive(Controller):
 
         self.flag = True
         # self.eng.run('mpc_matlab_setup.m', nargout=0)
-        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
+        # self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
 
     def __str__(self):
