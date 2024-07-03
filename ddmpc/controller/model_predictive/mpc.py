@@ -437,7 +437,6 @@ class ModelPredictive(Controller):
                     raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                                 f'for Objective {objective}.')
             
-        #HABRÍA QUE PONER elif isinstance(objective.feature.source, Product):
             elif isinstance(objective.feature.source, Product):
                 for (j,y) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_y)):
                     if y in {(objective.feature.source.b1.col_name,0), (f"Output({objective.feature.source.b1.name})",0)}:
@@ -525,8 +524,8 @@ class ModelPredictive(Controller):
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
         print(u0)
-        if type(u0) is float:
-            u0 = np.array([[u0]])
+        # if type(u0) is float:
+        #     u0 = np.array([[u0]])
         print("self.eng.workspace['current_time']/60/60/24",self.eng.workspace['current_time']/60/60/24)
         # mpcsolve = self.eng.workspace['mpcsolve']
         # print("mpcsolve",mpcsolve)
@@ -535,10 +534,13 @@ class ModelPredictive(Controller):
         solution: NLPSolution = self.nlp.solve(self.par_vals)
 
         
+        print("u0: ",u0)
         # retrieve the optimal controls
         # controls: dict[str, float] = solution.optimal_controls
-        controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val for val in u0[:][0]])}
-
+        # controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val for val in u0[:][0]])}
+        # controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0[0][0], self.state_space_joined.SS_u[1].name: u0[1][0]}
+        controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0}
+        
         additional_info: dict[str, float] = {'success': solution.success, 'runtime': solution.runtime}
 
         # append the solution to the solutions and save them to the disc
