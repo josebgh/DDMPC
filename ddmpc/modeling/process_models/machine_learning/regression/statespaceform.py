@@ -10,12 +10,10 @@ from ddmpc.data_handling.processing_data import TrainingData
 
 class StateSpace(Predictor):
     """
-    This clase recevie both a state space object and a linear regression 
-    object and predicts the output of the state space model. Note the linear regression is
-    required since the lumped input vector is not directly compatible with the state space model.
+    This clase recevie both a state space object and a linear regression object and predicts the output of the state space model. Note the linear regression is required since the lumped input vector is not directly compatible with the state space model.
     """
     def __init__(self,state_space: StateSpace_ABCDE,linear_regression: LinearRegression):
-
+        """ Initialize the StateSpace class """
         super(StateSpace, self).__init__()
         self.state_space = state_space
         self.linear_regression = linear_regression
@@ -31,4 +29,5 @@ class StateSpace(Predictor):
         x = self.state_space.A @ x + self.state_space.B @ u + self.state_space.Ex @ d + self.state_space.x_offset
         # FALTA INCLUIR METODO PAR ASEGURAR QUE LAS VARIABLES CONTROLLED SON LAS PRIMERAS EN EL SS.
         return y
+
 

@@ -147,6 +147,7 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
     SS_output.model_SS_x = ( linear_regression.output.source.col_name in [ input.source.name for input in linear_regression.inputs ] ) or ( isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name in [ input.source.col_name for input in linear_regression.inputs ] ))
     # C AND D SHOULDN'T BE CALCULATED IN THIS WAY, BUT USING EYE MATRICES TO STATES AND OUTPUTS.
     for f in linear_regression.inputs:
+        print(f.source)
         if f.source in model.controlled:
             for i in range(0, f.lag):
                 coef = linear_regression.linear_model.coef_[0][total_i]

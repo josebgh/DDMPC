@@ -129,7 +129,6 @@ class Controlled(Feature):
 
         return df
 
-
 class Control(Feature):
 
     def __init__(
@@ -207,5 +206,5 @@ class Tracking(Feature):
 
     def _process(self, df: pd.DataFrame) -> pd.DataFrame:
         return df
-
+    
 
