@@ -440,8 +440,8 @@ class ModelPredictive(Controller):
 
         self.flag = True
         # self.eng.run('mpc_matlab_setup.m', nargout=0)
-        self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
-        # self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
+        # self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
 
     def __str__(self):
