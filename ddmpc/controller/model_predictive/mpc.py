@@ -483,8 +483,8 @@ class ModelPredictive(Controller):
 
         self.flag = True
         # self.eng.run('mpc_matlab_setup.m', nargout=0)
-        # self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
-        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
+        # self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
 
     def __str__(self):
@@ -523,18 +523,17 @@ class ModelPredictive(Controller):
             self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
-        print(u0)
         # if type(u0) is float:
         #     u0 = np.array([[u0]])
+        print("u0",u0)
         print("self.eng.workspace['current_time']/60/60/24",self.eng.workspace['current_time']/60/60/24)
         # mpcsolve = self.eng.workspace['mpcsolve']
         # print("mpcsolve",mpcsolve)
-        # self.eng.run('save_workspace.m', nargout=0)
+        self.eng.run('save_workspace.m', nargout=0)
 
         solution: NLPSolution = self.nlp.solve(self.par_vals)
 
         
-        print("u0: ",u0)
         # retrieve the optimal controls
         # controls: dict[str, float] = solution.optimal_controls
         # controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val for val in u0[:][0]])}
