@@ -7,8 +7,9 @@ from ddmpc.utils.file_manager import file_manager
 from ddmpc.utils.pickle_handler import read_pkl, write_pkl
 from ddmpc.utils.plotting import *
 import matlab.engine
-from ddmpc.modeling.process_models.utils.adapters import StateSpace_ABCDE,par_vals2SSvectors
+from ddmpc.modeling.process_models.utils.adapters import StateSpace_ABCDE,par_vals2SSvectors,par_vals2mu
 from ddmpc.modeling.features.features import Feature, Source, Constructed, Controlled, Control,Connection
+from ddmpc.modeling.features.constructed import Change, Product, Func
 from ddmpc.utils.modes import Economic, Steady
 from ddmpc.controller.model_predictive.costs import Cost, AbsoluteLinear, Quadratic
 
@@ -58,6 +59,7 @@ class ModelPredictive(Controller):
         self.state_space_joined = StateSpace_ABCDE()
         self.state_space_joined = copy.deepcopy(self.state_spaces[0])
         self.state_spaces.pop(0)
+        self.calc_mu = []
         
         for (n,state_space) in enumerate(self.state_spaces):
 
@@ -100,7 +102,7 @@ class ModelPredictive(Controller):
                 not_in = True
                 for i,f_joined in enumerate(self.state_space_joined.SS_y):
                     if f.name == f_joined.name:
-                        self.state_space_joined.SS_y[i].lag = max(f_joined.lag, f.lag)
+                        # self.state_space_joined.SS_y[i].lag = max(f_joined.lag, f.lag)
                         not_in = False
                 if not_in:
                     self.state_space_joined.add_y(input=f)
@@ -252,38 +254,64 @@ class ModelPredictive(Controller):
                             self.state_space_joined.set_Ey(Ey_new)
 
                 elif isinstance(objective.feature, Connection):
-                    y_new = copy.deepcopy(objective.feature.source)
-                    self.state_space_joined.add_y(y_new)
-                    self.state_space_joined.set_y_offset(0.,len(self.state_space_joined.y_offset))
-                    # Convertir un y que apunte al incremento de la variable de estado o acción de control
-                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)):
-                        if x == (objective.feature.source.base.col_name,0):
-                            C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
-                            C_new[:-1,:] = self.state_space_joined.C
-                            C_new[-1,i] = 1
-                            C_new[-1,i+1] = -1
-                            self.state_space_joined.set_C(C_new)
-                            D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
-                            D_new[:-1,:] = self.state_space_joined.D
-                            self.state_space_joined.set_D(D_new)
-                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
-                            Ey_new[:-1,:] = self.state_space_joined.Ey
-                            self.state_space_joined.set_Ey(Ey_new)
-                    for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u,isoutputs=True)):
-                        if u == (objective.feature.source.base.col_name,0):
-                            C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
-                            C_new[:-1,:] = self.state_space_joined.C
-                            self.state_space_joined.set_C(C_new)
-                            D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
-                            D_new[:-1,:] = self.state_space_joined.D
-                            D_new[-1,i] = 1
-                            u_prev = (u[0],1)
-                            pos_prev_u = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x).index(u_prev)
-                            C_new[-1,pos_prev_u] = -1
-                            self.state_space_joined.set_D(D_new)
-                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
-                            Ey_new[:-1,:] = self.state_space_joined.Ey
-                            self.state_space_joined.set_Ey(Ey_new)
+                    if isinstance(objective.feature.source, Change):
+                        y_new = copy.deepcopy(objective.feature.source)
+                        self.state_space_joined.add_y(y_new)
+                        self.state_space_joined.set_y_offset(0.,len(self.state_space_joined.y_offset))
+                        # Convertir un y que apunte al incremento de la variable de estado o acción de control
+                        for (i,x) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)):
+                            if x == (objective.feature.source.base.col_name,0):
+                                C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
+                                C_new[:-1,:] = self.state_space_joined.C
+                                C_new[-1,i] = 1
+                                C_new[-1,i+1] = -1
+                                self.state_space_joined.set_C(C_new)
+                                D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
+                                D_new[:-1,:] = self.state_space_joined.D
+                                self.state_space_joined.set_D(D_new)
+                                Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                                Ey_new[:-1,:] = self.state_space_joined.Ey
+                                self.state_space_joined.set_Ey(Ey_new)
+                        for (i,u) in enumerate(self.state_space_joined.get_extended_vector(self.state_space_joined.SS_u,isoutputs=True)):
+                            if u == (objective.feature.source.base.col_name,0):
+                                C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
+                                C_new[:-1,:] = self.state_space_joined.C
+                                self.state_space_joined.set_C(C_new)
+                                D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
+                                D_new[:-1,:] = self.state_space_joined.D
+                                D_new[-1,i] = 1
+                                u_prev = (u[0],1)
+                                pos_prev_u = self.state_space_joined.get_extended_vector(self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x).index(u_prev)
+                                C_new[-1,pos_prev_u] = -1
+                                self.state_space_joined.set_D(D_new)
+                                Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                                Ey_new[:-1,:] = self.state_space_joined.Ey
+                                self.state_space_joined.set_Ey(Ey_new)
+                    elif isinstance(objective.feature.source, Product):
+                        yProduct_isin = False
+                        for (i,y) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_y)):
+                            if y in {(objective.feature.source.b1.col_name,0), (objective.feature.source.b2.col_name,0), (f"Output({objective.feature.source.b1.name})",0), (f"Output({objective.feature.source.b2.name})",0)}:
+                                yProduct_isin = True
+                        if not yProduct_isin:
+                            for controlled in self.nlp.model.controlled:
+                                if controlled.source.col_name in {objective.feature.source.b1.col_name, objective.feature.source.b2.col_name}:
+                                    # Convertir una y que apunte a la variable de estado
+                                    for (i,x) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_x,rm_1st_lag=self.state_space_joined.rm_1st_lag_SS_x)):
+                                        if x == (controlled.source.col_name,0):
+                                            y_new = copy.deepcopy(self.state_space_joined.SS_x[i])
+                                            y_new.lag = 1
+                                            self.state_space_joined.add_y(y_new)
+                                            self.state_space_joined.set_y_offset(0.,len(self.state_space_joined.y_offset))
+                                            C_new = np.zeros((self.state_space_joined.C.shape[0]+1,self.state_space_joined.C.shape[1]))
+                                            C_new[:-1,:] = self.state_space_joined.C
+                                            C_new[-1,i] = 1
+                                            self.state_space_joined.set_C(C_new)
+                                            D_new = np.zeros((self.state_space_joined.D.shape[0]+1,self.state_space_joined.D.shape[1]))
+                                            D_new[:-1,:] = self.state_space_joined.D
+                                            self.state_space_joined.set_D(D_new)
+                                            Ey_new = np.zeros((self.state_space_joined.Ey.shape[0]+1,self.state_space_joined.Ey.shape[1]))
+                                            Ey_new[:-1,:] = self.state_space_joined.Ey
+                                            self.state_space_joined.set_Ey(Ey_new)
                 else:
                     raise ValueError(f"Objective {objective} feature is not Control, Controlled or Change")
                 
@@ -408,6 +436,22 @@ class ModelPredictive(Controller):
                 else:
                     raise NotImplementedError(f'Mode {objective.feature.mode} is not implemented yet '
                                                 f'for Objective {objective}.')
+            
+        #HABRÍA QUE PONER elif isinstance(objective.feature.source, Product):
+            elif isinstance(objective.feature.source, Product):
+                for (j,y) in enumerate(self.state_space_joined.get_extended_vector(vector=self.state_space_joined.SS_y)):
+                    if y in {(objective.feature.source.b1.col_name,0), (f"Output({objective.feature.source.b1.name})",0)}:
+                        i = j
+                        col_name = objective.feature.source.b2.col_name # You have to set the other variable
+                    if y in {(objective.feature.source.b2.col_name,0), (f"Output({objective.feature.source.b2.name})",0)}:
+                        i = j
+                        col_name = objective.feature.source.b1.col_name # You have to set the other variable
+                self.calc_mu.append((i,col_name))
+                if isinstance(objective.cost, AbsoluteLinear):
+                    eps_vars_AbsLin[0,i] = 1
+                    eps_weights_AbsLin[0,i] = objective.cost.weight
+                elif isinstance(objective.cost, Quadratic):
+                    S_q[i,i] = objective.cost.weight
             elif isinstance(objective.cost, AbsoluteLinear):
                 for i,y in enumerate(self.state_space_joined.SS_y):
                     if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
@@ -440,8 +484,8 @@ class ModelPredictive(Controller):
 
         self.flag = True
         # self.eng.run('mpc_matlab_setup.m', nargout=0)
-        self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
-        # self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
+        # self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
 
     def __str__(self):
@@ -467,8 +511,12 @@ class ModelPredictive(Controller):
 
         # x0,u_pre,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
         x0,d_full = par_vals2SSvectors(par_vals = self.par_vals, par_ids = self.par_ids, state_space = self.state_space_joined)
+        mu_full = np.ones((self.state_space_joined.get_ny(),self.nlp.N))
+        for i,col_name in self.calc_mu:
+            mu_full[i,:] = par_vals2mu(par_vals = self.par_vals, par_ids = self.par_ids, par_name = col_name, N = np.size(mu_full,1))
         self.eng.workspace['x0'] = x0
         self.eng.workspace['d_full'] = d_full
+        self.eng.workspace['mu_full'] = mu_full
         self.eng.workspace['current_time'] = current_time
         self.eng.workspace['T'] = self.step_size
         if self.flag:
@@ -477,6 +525,8 @@ class ModelPredictive(Controller):
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
         print(u0)
+        if type(u0) is float:
+            u0 = np.array([[u0]])
         print("self.eng.workspace['current_time']/60/60/24",self.eng.workspace['current_time']/60/60/24)
         # mpcsolve = self.eng.workspace['mpcsolve']
         # print("mpcsolve",mpcsolve)
@@ -487,7 +537,7 @@ class ModelPredictive(Controller):
         
         # retrieve the optimal controls
         # controls: dict[str, float] = solution.optimal_controls
-        controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0[0][0], self.state_space_joined.SS_u[1].name: u0[1][0]}
+        controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val for val in u0[:][0]])}
 
         additional_info: dict[str, float] = {'success': solution.success, 'runtime': solution.runtime}
 

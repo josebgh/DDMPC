@@ -354,3 +354,17 @@ def par_vals2SSvectors(par_vals: list, par_ids: list, state_space: StateSpace_AB
     
     # return x0, u_pre, d_full
     return x0, d_full
+
+
+def par_vals2mu(par_vals: list, par_ids: list, par_name: str, N: int) -> np.ndarray:
+    """
+    This function receive the parameters vector and returns the state space vectors x, u and d.
+    """
+    par_dict = dict(zip(par_ids, par_vals))
+    mu_ids = [(par_name, i) for i in range(N)]
+    mu_vals = list()
+    for key in mu_ids:
+        mu_vals.append(par_dict[key])
+
+    mu_vals = np.array([mu_vals])
+    return mu_vals

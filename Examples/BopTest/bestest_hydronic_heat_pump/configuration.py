@@ -111,9 +111,9 @@ system = BopTest(
 power_hp_TrainingData = TrainingData(
     inputs=Inputs(
         Input(source=u_hp, lag=1),
-        Input(source=u_hp_logistic, lag=1),
+        # Input(source=u_hp_logistic, lag=1),
         Input(source=t_amb, lag=1),
-        Input(source=TAirRoom_change, lag=1),
+        # Input(source=TAirRoom_change, lag=1),
         Input(source=TAirRoom, lag=1),
     ),
     output=Output(power_hp),
