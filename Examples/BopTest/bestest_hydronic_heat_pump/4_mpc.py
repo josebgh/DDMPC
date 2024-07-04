@@ -96,9 +96,9 @@ for repetition in range(7):
     TAirRoom_TrainingData.split(0.7, 0.15, 0.15)
     TAirRoom_predictor.fit(
         training_data=TAirRoom_TrainingData,
-        epochs=100,
-        batch_size=50,
-        verbose=1,
+        # epochs=100,
+        # batch_size=50,
+        # verbose=1,
     )
     TAirRoom_predictor.test(training_data=TAirRoom_TrainingData, show_plot=True)
     power_hp_TrainingData.add(online_data)
