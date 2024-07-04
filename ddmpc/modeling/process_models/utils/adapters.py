@@ -152,7 +152,7 @@ def lr2ss(linear_regression: LinearRegression, model: Model) -> StateSpace_ABCDE
                 coef = linear_regression.linear_model.coef_[0][total_i]
                 C[0][C_i] = coef
                 if SS_output.model_SS_x:
-                    if isinstance(linear_regression.output.source,Change):
+                    if isinstance(linear_regression.output.source,Change) and ( linear_regression.output.source.base.col_name == f.source.col_name ) and i==0:
                         A[0][C_i] = coef + 1
                     else:
                         A[0][C_i] = coef

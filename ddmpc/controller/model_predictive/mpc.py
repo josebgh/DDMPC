@@ -481,11 +481,12 @@ class ModelPredictive(Controller):
         self.eng.workspace['y_ref_night'] = y_ref_night
         self.eng.workspace['N'] = self.nlp.N
 
+        self.eng.run('save_workspace_1.m', nargout=0)
+
         self.flag = True
         # self.eng.run('mpc_matlab_setup.m', nargout=0)
-        self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
-        # self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
-
+        # self.eng.run('mpc_matlab_setup_nontracking.m', nargout=0)
+        self.eng.run('mpc_matlab_setup_tracking.m', nargout=0)
 
     def __str__(self):
         return f'ModelPredictive()'
@@ -519,26 +520,27 @@ class ModelPredictive(Controller):
         self.eng.workspace['current_time'] = current_time
         self.eng.workspace['T'] = self.step_size
         if self.flag:
-            self.eng.run('save_workspace.m', nargout=0)
+            # self.eng.run('save_workspace.m', nargout=0)
+            self.eng.run('save_workspace_2.m', nargout=0)
             self.flag = False
         self.eng.run('mpc_matlab.m', nargout=0)
         u0 = self.eng.workspace['u0']
-        # if type(u0) is float:
-        #     u0 = np.array([[u0]])
-        print("u0",u0)
+        if type(u0) is float:
+            u0 = np.array([[u0]])
         print("self.eng.workspace['current_time']/60/60/24",self.eng.workspace['current_time']/60/60/24)
         # mpcsolve = self.eng.workspace['mpcsolve']
         # print("mpcsolve",mpcsolve)
-        self.eng.run('save_workspace.m', nargout=0)
+        # self.eng.run('save_workspace.m', nargout=0)
 
         solution: NLPSolution = self.nlp.solve(self.par_vals)
 
         
         # retrieve the optimal controls
         # controls: dict[str, float] = solution.optimal_controls
-        # controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val for val in u0[:][0]])}
-        # controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0[0][0], self.state_space_joined.SS_u[1].name: u0[1][0]}
-        controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0}
+        controls: dict[str,float] = {name: val for name,val in zip([u.name for u in self.state_space_joined.SS_u], [val[0] for val in u0])}
+        print("controls: ",controls)
+        # controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0[0,0], self.state_space_joined.SS_u[1].name: u0[1,0]}
+        # controls: dict[str,float] = {self.state_space_joined.SS_u[0].name: u0}
         
         additional_info: dict[str, float] = {'success': solution.success, 'runtime': solution.runtime}
 
