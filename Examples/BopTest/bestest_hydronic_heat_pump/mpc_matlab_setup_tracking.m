@@ -38,7 +38,7 @@ d = sdpvar(nd*ones(1,N),ones(1,N),'full');
 yss = sdpvar(ny*ones(1,N),ones(1,N),'full');
 
 % tracking cost weighting matrices
-Q = 100*eye(nx);
+Q = 1*eye(nx);
 R = eye(nu);
 
 cost = 0;
@@ -106,8 +106,8 @@ end
     % constr = constr + [ xss{1} == A*xss{N} + B*uss{N} + Ex*d{N} + x_offset' ];
     
 % Create MPC object
-% options = sdpsettings('solver','quadprog','verbose',1);
-options = sdpsettings('solver','gurobi','verbose',1);
+options = sdpsettings('solver','quadprog','verbose',1);
+% options = sdpsettings('solver','gurobi','verbose',1);
 % options = sdpsettings('solver','fmincon','verbose',1);
 % options = sdpsettings('solver','','verbose',1);
 
