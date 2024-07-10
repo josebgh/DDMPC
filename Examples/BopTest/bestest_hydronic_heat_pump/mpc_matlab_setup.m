@@ -85,8 +85,8 @@ for k=1:N
 end
     
 % Create MPC object
-options = sdpsettings('solver','quadprog','verbose',1);
-% options = sdpsettings('solver','gurobi','verbose',1);
+% options = sdpsettings('solver','quadprog','verbose',1);
+options = sdpsettings('solver','gurobi','verbose',1);
 % options = sdpsettings('solver','fmincon','verbose',1);
 % options = sdpsettings('solver','','verbose',1);
 

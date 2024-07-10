@@ -448,9 +448,9 @@ class ModelPredictive(Controller):
                 self.calc_mu.append((i,col_name))
                 if isinstance(objective.cost, AbsoluteLinear):
                     eps_vars_AbsLin[0,i] = 1
-                    eps_weights_AbsLin[0,i] = objective.cost.weight
+                    eps_weights_AbsLin[0,i] = objective.cost.weight*objective.feature.source.scale
                 elif isinstance(objective.cost, Quadratic):
-                    S_q[i,i] = objective.cost.weight
+                    S_q[i,i] = objective.cost.weight*objective.feature.source.scale
             elif isinstance(objective.cost, AbsoluteLinear):
                 for i,y in enumerate(self.state_space_joined.SS_y):
                     if objective.feature.source.col_name == (y.source.col_name if hasattr(y,'source') else y.name):
